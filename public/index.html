@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Darts – Cut Throat</title>
+  <link rel="stylesheet" href="/css/shared.css" />
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: #1a1a2e;
+      color: #eee;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    .logo {
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #e94560;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      color: #a0a0c0;
+      margin-bottom: 2.5rem;
+      font-size: 1.1rem;
+    }
+
+    .card {
+      background: #16213e;
+      border-radius: 16px;
+      padding: 2rem 2.5rem;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    h2 {
+      margin: 0 0 1.5rem;
+      font-size: 1.4rem;
+      color: #e0e0ff;
+    }
+
+    #players-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+    }
+
+    .player-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .player-row input {
+      flex: 1;
+      padding: 0.6rem 0.9rem;
+      border-radius: 8px;
+      border: 1.5px solid #2a2a5a;
+      background: #0f3460;
+      color: #eee;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .player-row input:focus {
+      border-color: #e94560;
+    }
+
+    .btn-remove {
+      background: transparent;
+      border: none;
+      color: #e94560;
+      font-size: 1.3rem;
+      cursor: pointer;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+
+    .btn-remove:hover {
+      background: rgba(233,69,96,0.15);
+    }
+
+    .btn-add {
+      background: transparent;
+      border: 1.5px dashed #2a2a5a;
+      color: #a0a0c0;
+      width: 100%;
+      padding: 0.6rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.2s;
+    }
+
+    .btn-add:hover {
+      border-color: #e94560;
+      color: #e94560;
+    }
+
+    .btn-start {
+      margin-top: 1.5rem;
+      width: 100%;
+      padding: 0.85rem;
+      background: #e94560;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.15rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .btn-start:hover {
+      background: #c73652;
+    }
+
+    .btn-start:active {
+      transform: scale(0.98);
+    }
+
+    #error-msg {
+      color: #e94560;
+      margin-top: 0.7rem;
+      font-size: 0.95rem;
+      min-height: 1.2rem;
+    }
+
+    .rules {
+      max-width: 480px;
+      margin-top: 2rem;
+      background: rgba(255,255,255,0.04);
+      border-radius: 12px;
+      padding: 1.2rem 1.5rem;
+      color: #8888aa;
+      font-size: 0.9rem;
+      line-height: 1.7;
+    }
+
+    .rules h3 {
+      color: #e0e0ff;
+      margin: 0 0 0.6rem;
+      font-size: 1rem;
+    }
+
+    .rules ul {
+      margin: 0;
+      padding-left: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">🎯 DARTS</div>
+  <div class="subtitle">Cut Throat Mode</div>
+
+  <div class="card">
+    <h2>New Game</h2>
+    <div id="players-list"></div>
+    <button class="btn-add" id="btn-add">+ Add Player</button>
+    <div id="error-msg"></div>
+    <button class="btn-start" id="btn-start">Start Game</button>
+  </div>
+
+  <div class="rules">
+    <h3>Cut Throat Rules</h3>
+    <ul>
+      <li>Targets: 15, 16, 17, 18, 19, 20, Bull</li>
+      <li>Hit a number 3 times to <strong>close</strong> it</li>
+      <li>Once closed, extra hits add points to opponents who haven't closed it</li>
+      <li>Goal: close all numbers with the <strong>lowest score</strong></li>
+    </ul>
+  </div>
+
+  <script>
+    const playersList = document.getElementById('players-list');
+    const btnAdd = document.getElementById('btn-add');
+    const btnStart = document.getElementById('btn-start');
+    const errorMsg = document.getElementById('error-msg');
+
+    function addPlayerRow(value = '') {
+      const row = document.createElement('div');
+      row.className = 'player-row';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = `Player ${playersList.children.length + 1}`;
+      input.maxLength = 30;
+      input.value = value;
+
+      const btn = document.createElement('button');
+      btn.className = 'btn-remove';
+      btn.textContent = '✕';
+      btn.title = 'Remove player';
+      btn.onclick = () => {
+        if (playersList.children.length > 2) {
+          row.remove();
+        }
+      };
+
+      row.appendChild(input);
+      row.appendChild(btn);
+      playersList.appendChild(row);
+    }
+
+    // Start with 2 players
+    addPlayerRow('Player 1');
+    addPlayerRow('Player 2');
+
+    btnAdd.addEventListener('click', () => {
+      if (playersList.children.length < 8) {
+        addPlayerRow('');
+      }
+    });
+
+    btnStart.addEventListener('click', async () => {
+      errorMsg.textContent = '';
+      const inputs = playersList.querySelectorAll('input');
+      const names = Array.from(inputs).map((i) => i.value.trim()).filter(Boolean);
+
+      if (names.length < 2) {
+        errorMsg.textContent = 'Please enter at least 2 player names.';
+        return;
+      }
+
+      btnStart.disabled = true;
+      btnStart.textContent = 'Starting…';
+
+      try {
+        const res = await fetch('/api/games', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerNames: names }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          errorMsg.textContent = data.error || 'Failed to create game.';
+          btnStart.disabled = false;
+          btnStart.textContent = 'Start Game';
+          return;
+        }
+
+        // Open the display page in a new tab (for big screen)
+        window.open(`/display/${data.gameId}`, '_blank');
+
+        // Show mobile links
+        showMobileLinks(data.gameId, data.players);
+      } catch (err) {
+        errorMsg.textContent = 'Network error, please try again.';
+        btnStart.disabled = false;
+        btnStart.textContent = 'Start Game';
+      }
+    });
+
+    function showMobileLinks(gameId, players) {
+      document.querySelector('.card').innerHTML = `
+        <h2>Game Created! 🎯</h2>
+        <p style="color:#a0a0c0;margin-bottom:1.2rem;">
+          The big screen display has been opened in a new tab.<br>
+          Share these links with each player:
+        </p>
+        ${players.map((p) => `
+          <div style="margin-bottom:1rem;">
+            <div style="color:#e0e0ff;font-weight:600;margin-bottom:0.3rem;">${escapeHtml(p.name)}</div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <input readonly value="${location.origin}/play/${gameId}/${p.id}"
+                style="flex:1;padding:0.5rem 0.8rem;border-radius:8px;border:1.5px solid #2a2a5a;
+                       background:#0f3460;color:#eee;font-size:0.9rem;outline:none;" />
+              <button onclick="copyLink(this)" data-url="${location.origin}/play/${gameId}/${p.id}"
+                style="padding:0.5rem 0.8rem;background:#e94560;color:#fff;border:none;
+                       border-radius:8px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">
+                Copy
+              </button>
+            </div>
+          </div>
+        `).join('')}
+        <button onclick="location.reload()"
+          style="margin-top:1rem;width:100%;padding:0.75rem;background:transparent;
+                 color:#e94560;border:1.5px solid #e94560;border-radius:10px;
+                 font-size:1rem;cursor:pointer;">
+          New Game
+        </button>
+      `;
+    }
+
+    function copyLink(btn) {
+      navigator.clipboard.writeText(btn.dataset.url).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => (btn.textContent = 'Copy'), 1800);
+      });
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  </script>
+</body>
+</html>
