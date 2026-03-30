@@ -22,7 +22,7 @@ const games = {};
 
 // ── In-memory wins history ────────────────────────────────────────────────────
 // wins = [{ playerName, date }]
-const wins = [];
+let wins = [];
 
 // ── Helper: sanitize a player name ──────────────────────────────────────────
 function sanitizeName(name) {
@@ -61,6 +61,7 @@ app.post('/api/games', (req, res) => {
     dartsThrown: 0,           // darts thrown this turn (0-3)
     turnHistory: [],           // [{ playerId, throws: [{target, multiplier, result}] }]
     currentTurnThrows: [],     // throws within the current turn
+    claimedPlayerIds: new Set(), // player IDs that have been claimed by a device
     gameOver: false,
     winnerId: null,
     createdAt: Date.now(),
@@ -131,7 +132,7 @@ app.post('/api/games/:gameId/throw', (req, res) => {
     if (winner) {
       wins.push({ playerName: winner.name, date: new Date().toISOString() });
       // Keep the wins log from growing indefinitely
-      if (wins.length > 1000) wins.splice(0, wins.length - 1000);
+      if (wins.length > 1000) wins = wins.slice(-1000);
     }
   }
 
@@ -175,7 +176,29 @@ app.post('/api/games/:gameId/end-turn', (req, res) => {
   return res.json(gameState(game));
 });
 
-// ── Page routes ───────────────────────────────────────────────────────────────
+/**
+ * POST /api/games/:gameId/claim/:playerId
+ * Atomically claims a player slot for a device.
+ * Returns 409 if that player has already been claimed by another device.
+ */
+app.post('/api/games/:gameId/claim/:playerId', (req, res) => {
+  const game = games[req.params.gameId];
+  if (!game) return res.status(404).json({ error: 'Game not found.' });
+
+  const { playerId } = req.params;
+  const player = game.players.find(p => p.id === playerId);
+  if (!player) return res.status(404).json({ error: 'Player not found.' });
+
+  if (game.claimedPlayerIds.has(playerId)) {
+    return res.status(409).json({ error: 'This player has already been taken by another device.' });
+  }
+
+  // Node.js is single-threaded: has() + add() is effectively atomic for in-memory state.
+  game.claimedPlayerIds.add(playerId);
+  // Broadcast updated state so the join page reflects the new claim
+  io.to(game.id).emit('gameUpdate', gameState(game));
+  return res.json({ ok: true });
+});
 
 /**
  * GET /api/wins
@@ -259,6 +282,7 @@ function gameState(game) {
     gameOver: game.gameOver,
     winnerId: game.winnerId,
     targets: TARGETS,
+    claimedPlayerIds: [...game.claimedPlayerIds],
   };
 }
 

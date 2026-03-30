@@ -91,6 +91,27 @@
       background: rgba(233,69,96,0.08);
     }
 
+    .player-card.taken {
+      opacity: 0.45;
+      cursor: not-allowed;
+      pointer-events: none;
+      border-color: #3a3a5a;
+    }
+
+    .player-card.taken .btn-join-icon {
+      display: none;
+    }
+
+    .taken-badge {
+      font-size: 0.75rem;
+      color: #888;
+      background: #1a1a3a;
+      border-radius: 6px;
+      padding: 0.15rem 0.5rem;
+      margin-top: 0.2rem;
+      display: inline-block;
+    }
+
     .player-info {
       display: flex;
       flex-direction: column;
@@ -176,8 +197,13 @@
   <p class="hint">Only join as yourself — one device per player.</p>
 </main>
 
+<script src="/socket.io/socket.io.js"></script>
 <script>
   const gameId = location.pathname.split('/')[2];
+  const socket = io();
+
+  socket.emit('joinGame', { gameId });
+  socket.on('gameUpdate', render);
 
   async function load() {
     try {
@@ -199,6 +225,7 @@
     if (state.gameOver) {
       const winner = state.players.find(p => p.id === state.winnerId);
       document.getElementById('game-over-msg').style.display = 'block';
+      document.getElementById('player-list').style.display = 'none';
       document.getElementById('game-over-title').textContent =
         winner ? `🏆 ${esc(winner.name)} Wins!` : 'Game Over';
       document.getElementById('game-over-detail').textContent =
@@ -206,28 +233,75 @@
       return;
     }
 
+    const claimed = new Set(state.claimedPlayerIds || []);
     const list = document.getElementById('player-list');
     list.style.display = 'flex';
+    list.innerHTML = '';
 
     state.players.forEach(p => {
       const closedCount = state.targets.filter(t => (p.marks[t] || 0) >= 3).length;
       const isCurrentTurn = p.id === state.currentPlayerId;
+      const isTaken = claimed.has(p.id);
 
-      const a = document.createElement('a');
-      a.className = 'player-card';
-      a.href = `/play/${gameId}/${p.id}`;
+      const card = document.createElement('div');
+      card.className = 'player-card' + (isTaken ? ' taken' : '');
 
-      a.innerHTML = `
+      card.innerHTML = `
         <div class="player-info">
           <span class="player-card-name">${esc(p.name)}${isCurrentTurn ? ' <span style="color:var(--red);font-size:0.85rem;">▶ Turn</span>' : ''}</span>
           <span class="player-card-score">${p.score} pts</span>
           <span class="player-card-marks">${closedCount}/${state.targets.length} targets closed</span>
+          ${isTaken ? '<span class="taken-badge">⛔ Already taken</span>' : ''}
         </div>
-        <span class="btn-join-icon">▶</span>
+        ${isTaken ? '' : '<span class="btn-join-icon">▶</span>'}
       `;
 
-      list.appendChild(a);
+      if (!isTaken) {
+        card.addEventListener('click', () => claimAndJoin(p.id, p.name, card));
+      }
+
+      list.appendChild(card);
     });
+  }
+
+  async function claimAndJoin(playerId, playerName, card) {
+    // Disable immediately to prevent double-tap
+    card.classList.add('taken');
+    card.style.pointerEvents = 'none';
+
+    try {
+      const res = await fetch(`/api/games/${gameId}/claim/${playerId}`, { method: 'POST' });
+      if (res.status === 409) {
+        // Someone else grabbed it just now – revert and refresh
+        card.classList.remove('taken');
+        card.style.pointerEvents = '';
+        showError(`"${esc(playerName)}" was just taken. Please choose another player.`);
+        // Re-fetch to get latest claimed state
+        const stateRes = await fetch(`/api/games/${gameId}`);
+        if (stateRes.ok) render(await stateRes.json());
+        return;
+      }
+      if (!res.ok) {
+        card.classList.remove('taken');
+        card.style.pointerEvents = '';
+        showError('Could not join. Please try again.');
+        return;
+      }
+      // Store in localStorage so the play page knows this device owns this slot
+      localStorage.setItem(`claimed_${gameId}_${playerId}`, '1');
+      location.href = `/play/${gameId}/${playerId}`;
+    } catch {
+      card.classList.remove('taken');
+      card.style.pointerEvents = '';
+      showError('Network error. Please try again.');
+    }
+  }
+
+  function showError(msg) {
+    const e = document.getElementById('error-msg');
+    e.style.display = 'block';
+    e.textContent = msg;
+    setTimeout(() => { e.style.display = 'none'; }, 4000);
   }
 
   function esc(str) {

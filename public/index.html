@@ -469,13 +469,13 @@
 
     loadDailyScoreboard();
     // Refresh every 30 seconds, but pause when the tab is not visible
-    let sbInterval = setInterval(loadDailyScoreboard, 30000);
+    let scoreboardRefreshInterval = setInterval(loadDailyScoreboard, 30000);
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        clearInterval(sbInterval);
+        clearInterval(scoreboardRefreshInterval);
       } else {
         loadDailyScoreboard();
-        sbInterval = setInterval(loadDailyScoreboard, 30000);
+        scoreboardRefreshInterval = setInterval(loadDailyScoreboard, 30000);
       }
     });
   </script>

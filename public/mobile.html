@@ -293,6 +293,27 @@
     #game-over .icon { font-size: 4rem; }
     #game-over h2 { font-size: 2rem; color: var(--red); }
     #game-over p { color: #a0a0d0; font-size: 1.1rem; }
+
+    /* Slot-taken error screen */
+    #slot-taken {
+      display: none;
+      flex: 1;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1rem;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    #slot-taken .icon { font-size: 4rem; }
+    #slot-taken h2 { font-size: 1.6rem; color: var(--red); }
+    #slot-taken p { color: #a0a0d0; font-size: 1rem; line-height: 1.6; }
+    #slot-taken a {
+      margin-top: 0.5rem;
+      color: #a0d0ff;
+      font-size: 0.95rem;
+    }
   </style>
 </head>
 <body>
@@ -346,6 +367,14 @@
   <p id="game-over-msg"></p>
 </div>
 
+<!-- Slot already taken by another device -->
+<div id="slot-taken">
+  <div class="icon">⛔</div>
+  <h2>Player Already Taken</h2>
+  <p>This player slot has already been claimed by another device.<br>Please go back and choose a different player.</p>
+  <a href="javascript:history.back()">← Go back</a>
+</div>
+
 <div id="toast"></div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -361,13 +390,59 @@
   let selectedMul = 1;
   let pendingThrows = []; // { target, multiplier } objects queued before submission
 
-  // Fetch initial state
-  fetch(`/api/games/${gameId}`)
-    .then(r => r.json())
-    .then(applyState)
-    .catch(() => showToast('Could not connect to game.'));
+  // ── Claim this player slot on load ───────────────────────────────────────
+  // If this device already owns the slot (page refresh), skip the claim call.
+  const claimKey = `claimed_${gameId}_${playerId}`;
+  const alreadyOwned = !!localStorage.getItem(claimKey);
 
-  socket.on('gameUpdate', applyState);
+  async function initClaim() {
+    if (alreadyOwned) {
+      // This device already claimed the slot – proceed straight to game
+      startGame();
+      return;
+    }
+    try {
+      const res = await fetch(`/api/games/${gameId}/claim/${playerId}`, { method: 'POST' });
+      if (res.status === 409) {
+        showSlotTaken();
+        return;
+      }
+      if (!res.ok) {
+        // Non-fatal: if the game/player wasn't found just let normal state load handle it
+      } else {
+        localStorage.setItem(claimKey, '1');
+      }
+    } catch {
+      // Network error on claim – proceed anyway; server is the authority
+    }
+    startGame();
+  }
+
+  function showSlotTaken() {
+    document.querySelector('header').style.display = 'none';
+    document.getElementById('play-area').style.display = 'none';
+    document.getElementById('waiting-overlay').style.display = 'none';
+    document.getElementById('game-over').style.display = 'none';
+    document.getElementById('slot-taken').style.display = 'flex';
+  }
+
+  function startGame() {
+    fetch(`/api/games/${gameId}`)
+      .then(r => r.json())
+      .then(applyState)
+      .catch(() => showToast('Could not connect to game.'));
+  }
+
+  socket.on('gameUpdate', (state) => {
+    // If another device claimed our slot before we finished loading, show the error screen.
+    if (!alreadyOwned && state.claimedPlayerIds && state.claimedPlayerIds.includes(playerId)) {
+      showSlotTaken();
+      return;
+    }
+    applyState(state);
+  });
+
+  initClaim();
 
   // ── State application ────────────────────────────────────────────────────
 
@@ -487,7 +562,8 @@
       if (t === 25 && selectedMul === 3) {
         selectedMul = 1;
         document.querySelectorAll('.mul-btn').forEach(b => b.classList.remove('selected'));
-        document.querySelector('.mul-btn[data-mul="1"]').classList.add('selected');
+        const singleBtn = document.querySelector('.mul-btn[data-mul="1"]');
+        if (singleBtn) singleBtn.classList.add('selected');
       }
     }
     // Enable throw only if there are darts remaining this turn
