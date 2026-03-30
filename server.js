@@ -20,6 +20,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 // games[gameId] = { id, players[], currentPlayerIndex, turns[], gameOver, winnerId, createdAt }
 const games = {};
 
+// ── In-memory wins history ────────────────────────────────────────────────────
+// wins = [{ playerName, date }]
+const wins = [];
+
 // ── Helper: sanitize a player name ──────────────────────────────────────────
 function sanitizeName(name) {
   return String(name || '').trim().slice(0, 30).replace(/[<>"']/g, '');
@@ -106,6 +110,9 @@ app.post('/api/games/:gameId/throw', (req, res) => {
   if (t !== 0 && !TARGETS.includes(t)) {
     return res.status(400).json({ error: 'Invalid target.' });
   }
+  if (t === 25 && m === 3) {
+    return res.status(400).json({ error: 'Bullseye cannot be a triple (single=25, double=50 only).' });
+  }
 
   if (game.dartsThrown >= 3) {
     return res.status(409).json({ error: 'Turn already complete, call end-turn first.' });
@@ -120,6 +127,10 @@ app.post('/api/games/:gameId/throw', (req, res) => {
   if (gameOver) {
     game.gameOver = true;
     game.winnerId = winnerId;
+    const winner = game.players.find(p => p.id === winnerId);
+    if (winner) {
+      wins.push({ playerName: winner.name, date: new Date().toISOString() });
+    }
   }
 
   // Emit real-time update to all clients watching this game
@@ -164,6 +175,14 @@ app.post('/api/games/:gameId/end-turn', (req, res) => {
 
 // ── Page routes ───────────────────────────────────────────────────────────────
 
+/**
+ * GET /api/wins
+ * Returns the all-time wins history: [{ playerName, date }]
+ */
+app.get('/api/wins', (req, res) => {
+  res.json(wins);
+});
+
 const pageRateLimit = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 120,            // up to 120 page loads per minute per IP
@@ -185,6 +204,10 @@ app.get('/join/:gameId', pageRateLimit, (req, res) => {
 
 app.get('/play/:gameId/:playerId', pageRateLimit, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'mobile.html'));
+});
+
+app.get('/scoreboard', pageRateLimit, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'scoreboard.html'));
 });
 
 /**
@@ -244,4 +267,4 @@ server.listen(PORT, () => {
   console.log(`Darts server running on http://localhost:${PORT}`);
 });
 
-module.exports = { app, server, games };
+module.exports = { app, server, games, wins };

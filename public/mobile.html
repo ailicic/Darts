@@ -176,6 +176,11 @@
       color: var(--red);
     }
 
+    .mul-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
     /* Throw queue */
     .queue-label {
       color: #a0a0d0;
@@ -475,6 +480,16 @@
       const val = parseInt(btn.dataset.target, 10);
       btn.classList.toggle('selected', val === t);
     });
+    // Bull (25) cannot be a triple – disable the Triple button
+    const tripleBtn = document.querySelector('.mul-btn[data-mul="3"]');
+    if (tripleBtn) {
+      tripleBtn.disabled = (t === 25);
+      if (t === 25 && selectedMul === 3) {
+        selectedMul = 1;
+        document.querySelectorAll('.mul-btn').forEach(b => b.classList.remove('selected'));
+        document.querySelector('.mul-btn[data-mul="1"]').classList.add('selected');
+      }
+    }
     // Enable throw only if there are darts remaining this turn
     document.getElementById('btn-throw').disabled = pendingThrows.length >= 3;
   }
