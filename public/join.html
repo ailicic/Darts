@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Darts – Join Game</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red: #e94560;
+      --bg: #0d0d1a;
+      --card: #16213e;
+      --input-bg: #0f3460;
+      --border: #2a2a5a;
+    }
+
+    body {
+      background: var(--bg);
+      color: #eee;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    header {
+      background: var(--card);
+      border-bottom: 2px solid var(--red);
+      padding: 1rem 1.2rem;
+      text-align: center;
+    }
+
+    .header-title {
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--red);
+    }
+
+    .header-sub {
+      color: #a0a0d0;
+      font-size: 0.9rem;
+      margin-top: 0.2rem;
+    }
+
+    main {
+      flex: 1;
+      padding: 1.5rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.2rem;
+    }
+
+    .prompt {
+      color: #c0c0e0;
+      font-size: 1.05rem;
+      text-align: center;
+    }
+
+    #player-list {
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .player-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, transform 0.1s;
+      text-decoration: none;
+      color: #eee;
+    }
+
+    .player-card:active {
+      transform: scale(0.97);
+    }
+
+    .player-card:hover {
+      border-color: var(--red);
+      background: rgba(233,69,96,0.08);
+    }
+
+    .player-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .player-card-name {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    .player-card-score {
+      font-size: 0.85rem;
+      color: #a0a0d0;
+    }
+
+    .player-card-marks {
+      font-size: 0.8rem;
+      color: #a0a0d0;
+      letter-spacing: 1px;
+    }
+
+    .btn-join-icon {
+      font-size: 1.5rem;
+      color: var(--red);
+    }
+
+    /* Loading / error states */
+    #loading {
+      color: #a0a0d0;
+      font-size: 1.1rem;
+      margin-top: 2rem;
+    }
+
+    #error-msg {
+      color: var(--red);
+      font-size: 1rem;
+      text-align: center;
+      padding: 1rem;
+    }
+
+    /* Game over state */
+    #game-over-msg {
+      display: none;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    #game-over-msg .icon { font-size: 3rem; }
+    #game-over-msg h2 { color: var(--red); margin: 0.5rem 0; font-size: 1.5rem; }
+    #game-over-msg p { color: #a0a0d0; }
+
+    .hint {
+      max-width: 440px;
+      color: #666;
+      font-size: 0.85rem;
+      text-align: center;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">🎯 DARTS</div>
+  <div class="header-sub">Cut Throat – Join Game</div>
+</header>
+
+<main>
+  <p class="prompt">Who are you? Tap your name to start playing.</p>
+
+  <div id="loading">Loading players…</div>
+  <div id="error-msg" style="display:none"></div>
+
+  <div id="player-list" style="display:none"></div>
+
+  <div id="game-over-msg">
+    <div class="icon">🏆</div>
+    <h2 id="game-over-title">Game Over</h2>
+    <p id="game-over-detail"></p>
+  </div>
+
+  <p class="hint">Only join as yourself — one device per player.</p>
+</main>
+
+<script>
+  const gameId = location.pathname.split('/')[2];
+
+  async function load() {
+    try {
+      const res = await fetch(`/api/games/${gameId}`);
+      if (!res.ok) throw new Error('Game not found');
+      const state = await res.json();
+      render(state);
+    } catch (err) {
+      document.getElementById('loading').style.display = 'none';
+      const e = document.getElementById('error-msg');
+      e.style.display = 'block';
+      e.textContent = 'Could not load game. Make sure you scanned the right QR code.';
+    }
+  }
+
+  function render(state) {
+    document.getElementById('loading').style.display = 'none';
+
+    if (state.gameOver) {
+      const winner = state.players.find(p => p.id === state.winnerId);
+      document.getElementById('game-over-msg').style.display = 'block';
+      document.getElementById('game-over-title').textContent =
+        winner ? `🏆 ${esc(winner.name)} Wins!` : 'Game Over';
+      document.getElementById('game-over-detail').textContent =
+        winner ? `Winner score: ${winner.score} points` : '';
+      return;
+    }
+
+    const list = document.getElementById('player-list');
+    list.style.display = 'flex';
+
+    state.players.forEach(p => {
+      const closedCount = state.targets.filter(t => (p.marks[t] || 0) >= 3).length;
+      const isCurrentTurn = p.id === state.currentPlayerId;
+
+      const a = document.createElement('a');
+      a.className = 'player-card';
+      a.href = `/play/${gameId}/${p.id}`;
+
+      a.innerHTML = `
+        <div class="player-info">
+          <span class="player-card-name">${esc(p.name)}${isCurrentTurn ? ' <span style="color:var(--red);font-size:0.85rem;">▶ Turn</span>' : ''}</span>
+          <span class="player-card-score">${p.score} pts</span>
+          <span class="player-card-marks">${closedCount}/${state.targets.length} targets closed</span>
+        </div>
+        <span class="btn-join-icon">▶</span>
+      `;
+
+      list.appendChild(a);
+    });
+  }
+
+  function esc(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  load();
+</script>
+</body>
+</html>
