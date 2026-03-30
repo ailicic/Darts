@@ -119,9 +119,16 @@ app.post('/api/games/:gameId/throw', (req, res) => {
     return res.status(409).json({ error: 'Turn already complete, call end-turn first.' });
   }
 
+  // Snapshot player states before the throw so it can be undone via bounce
+  const snapshot = game.players.map((p) => ({
+    id: p.id,
+    marks: { ...p.marks },
+    score: p.score,
+  }));
+
   const result = processThrow(game.players, game.currentPlayerIndex, t, m);
   game.dartsThrown += 1;
-  game.currentTurnThrows.push({ target: t, multiplier: m, result });
+  game.currentTurnThrows.push({ target: t, multiplier: m, result, snapshot });
 
   const { gameOver, winnerId } = checkWinCondition(game.players);
 
@@ -173,6 +180,40 @@ app.post('/api/games/:gameId/end-turn', (req, res) => {
 
   io.to(game.id).emit('gameUpdate', gameState(game));
 
+  return res.json(gameState(game));
+});
+
+/**
+ * POST /api/games/:gameId/bounce
+ * Body: { playerId }
+ * Reverts the last dart throw in the current turn.
+ * Can only undo throws made within the current (not-yet-ended) turn.
+ */
+app.post('/api/games/:gameId/bounce', (req, res) => {
+  const game = games[req.params.gameId];
+  if (!game) return res.status(404).json({ error: 'Game not found.' });
+  if (game.gameOver) return res.status(409).json({ error: 'Game is already over.' });
+
+  const { playerId } = req.body;
+  const currentPlayer = game.players[game.currentPlayerIndex];
+
+  if (currentPlayer.id !== playerId) {
+    return res.status(403).json({ error: 'It is not your turn.' });
+  }
+
+  if (game.currentTurnThrows.length === 0) {
+    return res.status(409).json({ error: 'No throws to revert in the current turn.' });
+  }
+
+  // Pop the last throw and restore the player snapshot from before that throw
+  const lastThrow = game.currentTurnThrows.pop();
+  lastThrow.snapshot.forEach((saved, idx) => {
+    game.players[idx].marks = { ...saved.marks };
+    game.players[idx].score = saved.score;
+  });
+  game.dartsThrown -= 1;
+
+  io.to(game.id).emit('gameUpdate', gameState(game));
   return res.json(gameState(game));
 });
 
