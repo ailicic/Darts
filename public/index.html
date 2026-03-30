@@ -157,6 +157,98 @@
       margin: 0;
       padding-left: 1.2rem;
     }
+
+    /* Daily scoreboard */
+    .daily-scoreboard {
+      max-width: 480px;
+      width: 100%;
+      margin-top: 2rem;
+      background: #16213e;
+      border-radius: 16px;
+      padding: 1.5rem 1.8rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    .daily-scoreboard .sb-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.1rem;
+    }
+
+    .daily-scoreboard h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #e0e0ff;
+      margin: 0;
+    }
+
+    .daily-scoreboard .sb-date {
+      font-size: 0.8rem;
+      color: #a0a0c0;
+    }
+
+    .sb-row {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.55rem 0;
+      border-bottom: 1px solid #2a2a5a;
+    }
+
+    .sb-row:last-child { border-bottom: none; }
+
+    .sb-rank {
+      width: 24px;
+      text-align: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .sb-name {
+      flex: 1;
+      font-weight: 600;
+      color: #e0e0ff;
+      font-size: 1rem;
+      word-break: break-word;
+    }
+
+    .sb-wins {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #e94560;
+      flex-shrink: 0;
+    }
+
+    .sb-wins-label {
+      font-size: 0.75rem;
+      color: #a0a0c0;
+      flex-shrink: 0;
+    }
+
+    .sb-last-win {
+      font-size: 0.75rem;
+      color: #666;
+      flex-shrink: 0;
+    }
+
+    .sb-empty {
+      color: #555;
+      font-size: 0.95rem;
+      text-align: center;
+      padding: 1rem 0;
+    }
+
+    .sb-all-link {
+      display: block;
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      color: #a0d0ff;
+      text-decoration: none;
+    }
+
+    .sb-all-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -179,6 +271,15 @@
       <li>Once closed, extra hits add points to opponents who haven't closed it</li>
       <li>Goal: close all numbers with the <strong>lowest score</strong></li>
     </ul>
+  </div>
+
+  <div class="daily-scoreboard">
+    <div class="sb-header">
+      <h3>🏆 Today's Scoreboard</h3>
+      <span class="sb-date" id="sb-date"></span>
+    </div>
+    <div id="sb-body"><div class="sb-empty">Loading…</div></div>
+    <a class="sb-all-link" href="/scoreboard">View all-time scoreboard →</a>
   </div>
 
   <script>
@@ -303,6 +404,80 @@
     function escapeHtml(str) {
       return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
+
+    // ── Daily scoreboard ──────────────────────────────────────────────────────
+
+    function isSameDay(isoDate) {
+      const d = new Date(isoDate);
+      const now = new Date();
+      return d.getFullYear() === now.getFullYear() &&
+             d.getMonth() === now.getMonth() &&
+             d.getDate() === now.getDate();
+    }
+
+    function formatTime(isoDate) {
+      return new Date(isoDate).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function rankEmoji(i) {
+      return ['🥇','🥈','🥉'][i] || `${i + 1}.`;
+    }
+
+    function renderDailyScoreboard(wins) {
+      const sbBody = document.getElementById('sb-body');
+      const sbDate = document.getElementById('sb-date');
+
+      sbDate.textContent = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+
+      const todayWins = wins.filter(w => isSameDay(w.date));
+
+      if (todayWins.length === 0) {
+        sbBody.innerHTML = '<div class="sb-empty">No games finished today yet. Be the first! 🎯</div>';
+        return;
+      }
+
+      // Group by player name, track win count and last win time
+      const map = {};
+      todayWins.forEach(w => {
+        if (!map[w.playerName]) map[w.playerName] = { count: 0, lastDate: w.date };
+        map[w.playerName].count++;
+        if (w.date > map[w.playerName].lastDate) map[w.playerName].lastDate = w.date;
+      });
+
+      const sorted = Object.entries(map).sort((a, b) => b[1].count - a[1].count);
+
+      sbBody.innerHTML = sorted.map(([name, { count, lastDate }], i) => `
+        <div class="sb-row">
+          <span class="sb-rank">${rankEmoji(i)}</span>
+          <span class="sb-name">${escapeHtml(name)}</span>
+          <span class="sb-wins">${count}</span>
+          <span class="sb-wins-label">win${count !== 1 ? 's' : ''}</span>
+          <span class="sb-last-win">last: ${formatTime(lastDate)}</span>
+        </div>
+      `).join('');
+    }
+
+    function loadDailyScoreboard() {
+      fetch('/api/wins')
+        .then(r => r.json())
+        .then(renderDailyScoreboard)
+        .catch(() => {
+          document.getElementById('sb-body').innerHTML =
+            '<div class="sb-empty">Could not load scoreboard.</div>';
+        });
+    }
+
+    loadDailyScoreboard();
+    // Refresh every 30 seconds, but pause when the tab is not visible
+    let scoreboardRefreshInterval = setInterval(loadDailyScoreboard, 30000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        clearInterval(scoreboardRefreshInterval);
+      } else {
+        loadDailyScoreboard();
+        scoreboardRefreshInterval = setInterval(loadDailyScoreboard, 30000);
+      }
+    });
   </script>
 </body>
 </html>

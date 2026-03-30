@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Darts – Scoreboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d0d1a;
+      color: #eee;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.8rem 2rem;
+      background: #16213e;
+      border-bottom: 2px solid #e94560;
+    }
+
+    .header-title {
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #e94560;
+    }
+
+    .back-link {
+      color: #a0d0ff;
+      text-decoration: none;
+      font-size: 1rem;
+    }
+
+    .back-link:hover { text-decoration: underline; }
+
+    main {
+      flex: 1;
+      padding: 2rem;
+      max-width: 900px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    h2 {
+      font-size: 1.4rem;
+      color: #a0a0d0;
+      margin-bottom: 1.5rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    /* Summary cards */
+    #summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .summary-card {
+      background: #16213e;
+      border: 2px solid #2a2a5a;
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .summary-card .wins-count {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #e94560;
+      line-height: 1.1;
+    }
+
+    .summary-card .player-name {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #e0e0ff;
+      margin-top: 0.25rem;
+      word-break: break-word;
+    }
+
+    .summary-card .wins-label {
+      font-size: 0.75rem;
+      color: #a0a0d0;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* History table */
+    h3 {
+      font-size: 1rem;
+      color: #a0a0d0;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 0.75rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.6rem 0.9rem;
+      border: 1px solid #2a2a5a;
+    }
+
+    thead th {
+      background: #16213e;
+      color: #a0a0d0;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    tbody tr:nth-child(odd) { background: #0f0f22; }
+    tbody tr:nth-child(even) { background: #12122a; }
+
+    tbody td { color: #eee; }
+
+    tbody td.winner-name {
+      font-weight: 700;
+      color: #e94560;
+    }
+
+    #empty-msg {
+      color: #555;
+      font-size: 1.1rem;
+      text-align: center;
+      margin-top: 3rem;
+    }
+
+    #loading-msg {
+      color: #a0a0d0;
+      text-align: center;
+      margin-top: 3rem;
+      font-size: 1.1rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">🏆 SCOREBOARD</div>
+  <a class="back-link" href="/">← New Game</a>
+</header>
+
+<main>
+  <h2>All-Time Wins</h2>
+
+  <div id="summary-grid"></div>
+
+  <h3>Win History</h3>
+  <div id="history-container">
+    <div id="loading-msg">Loading…</div>
+  </div>
+</main>
+
+<script>
+  function esc(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  }
+
+  fetch('/api/wins')
+    .then(r => r.json())
+    .then(wins => {
+      const container = document.getElementById('history-container');
+      const summaryGrid = document.getElementById('summary-grid');
+
+      if (!wins || wins.length === 0) {
+        summaryGrid.innerHTML = '';
+        container.innerHTML = '<div id="empty-msg">No games completed yet. Play some darts! 🎯</div>';
+        return;
+      }
+
+      // Build summary: wins per player
+      const counts = {};
+      wins.forEach(w => {
+        counts[w.playerName] = (counts[w.playerName] || 0) + 1;
+      });
+
+      // Sort by wins descending
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      summaryGrid.innerHTML = sorted.map(([name, count]) => `
+        <div class="summary-card">
+          <div class="wins-count">${count}</div>
+          <div class="wins-label">win${count !== 1 ? 's' : ''}</div>
+          <div class="player-name">${esc(name)}</div>
+        </div>
+      `).join('');
+
+      // History table – most recent first
+      const rows = [...wins].reverse().map(w => `
+        <tr>
+          <td class="winner-name">🏆 ${esc(w.playerName)}</td>
+          <td>${esc(formatDate(w.date))}</td>
+        </tr>
+      `).join('');
+
+      container.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Winner</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    })
+    .catch(() => {
+      document.getElementById('history-container').innerHTML =
+        '<div id="empty-msg">Could not load scoreboard.</div>';
+    });
+</script>
+</body>
+</html>
