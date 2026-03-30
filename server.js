@@ -3,6 +3,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const QRCode = require('qrcode');
+const rateLimit = require('express-rate-limit');
 
 const { createPlayer, processThrow, checkWinCondition, TARGETS } = require('./gameLogic');
 
@@ -121,7 +123,7 @@ app.post('/api/games/:gameId/throw', (req, res) => {
   }
 
   // Emit real-time update to all clients watching this game
-  io.to(gameId(game)).emit('gameUpdate', gameState(game));
+  io.to(game.id).emit('gameUpdate', gameState(game));
 
   return res.json(gameState(game));
 });
@@ -155,23 +157,56 @@ app.post('/api/games/:gameId/end-turn', (req, res) => {
   game.dartsThrown = 0;
   game.currentTurnThrows = [];
 
-  io.to(gameId(game)).emit('gameUpdate', gameState(game));
+  io.to(game.id).emit('gameUpdate', gameState(game));
 
   return res.json(gameState(game));
 });
 
 // ── Page routes ───────────────────────────────────────────────────────────────
 
-app.get('/', (req, res) => {
+const pageRateLimit = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 120,            // up to 120 page loads per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.get('/', pageRateLimit, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.get('/display/:gameId', (req, res) => {
+app.get('/display/:gameId', pageRateLimit, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'display.html'));
 });
 
-app.get('/play/:gameId/:playerId', (req, res) => {
+app.get('/join/:gameId', pageRateLimit, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'join.html'));
+});
+
+app.get('/play/:gameId/:playerId', pageRateLimit, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'mobile.html'));
+});
+
+/**
+ * GET /api/games/:gameId/join-qr
+ * Returns an SVG QR code whose content is the join URL for this game.
+ * The join URL points to /join/:gameId so any player can pick their seat.
+ */
+app.get('/api/games/:gameId/join-qr', async (req, res) => {
+  const game = games[req.params.gameId];
+  if (!game) return res.status(404).json({ error: 'Game not found.' });
+
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.get('host');
+  const joinUrl = `${proto}://${host}/join/${req.params.gameId}`;
+
+  try {
+    const svg = await QRCode.toString(joinUrl, { type: 'svg', margin: 2, width: 250 });
+    res.set('Content-Type', 'image/svg+xml');
+    res.send(svg);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate QR code.' });
+  }
 });
 
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
@@ -187,10 +222,6 @@ io.on('connection', (socket) => {
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function gameId(game) {
-  return game.id;
-}
 
 function gameState(game) {
   return {

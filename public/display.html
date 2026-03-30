@@ -179,6 +179,90 @@
       font-size: 1.5rem;
       color: #a0a0d0;
     }
+
+    /* ── QR Panel ──────────────────────────────────────────────────────────── */
+    #qr-panel {
+      position: fixed;
+      bottom: 80px; /* above the feed panel */
+      right: 1.5rem;
+      background: #16213e;
+      border: 2px solid #2a2a5a;
+      border-radius: 16px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      z-index: 10;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      transition: opacity 0.3s;
+    }
+
+    #qr-panel.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #qr-panel .qr-label {
+      color: #a0a0d0;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+
+    #qr-panel .qr-title {
+      color: #e0e0ff;
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    #qr-img {
+      width: 160px;
+      height: 160px;
+      border-radius: 8px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #qr-img svg {
+      width: 160px;
+      height: 160px;
+    }
+
+    #qr-panel .qr-url {
+      color: #666;
+      font-size: 0.7rem;
+      text-align: center;
+      word-break: break-all;
+      max-width: 160px;
+    }
+
+    #btn-toggle-qr {
+      position: fixed;
+      bottom: 80px;
+      right: 1.5rem;
+      background: #16213e;
+      border: 2px solid #e94560;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      font-size: 1.3rem;
+      cursor: pointer;
+      display: none; /* shown after QR loaded */
+      align-items: center;
+      justify-content: center;
+      color: #eee;
+      z-index: 11;
+      transition: background 0.15s;
+    }
+
+    #btn-toggle-qr.qr-visible {
+      display: none; /* only show toggle after QR panel is hidden */
+    }
   </style>
 </head>
 <body>
@@ -189,6 +273,14 @@
 </header>
 
 <div id="game-over-banner"></div>
+
+<!-- QR code panel – shown in corner so players can scan to join -->
+<div id="qr-panel">
+  <div class="qr-title">📱 Scan to Join</div>
+  <div id="qr-img"><span style="color:#555;font-size:0.8rem">Loading…</span></div>
+  <div class="qr-label">Point your phone camera here</div>
+  <div class="qr-url" id="qr-url"></div>
+</div>
 
 <div id="main-content">
   <div class="connecting" id="connecting-msg">Connecting to game…</div>
@@ -216,6 +308,33 @@
     .then(renderGame)
     .catch(() => {});
 
+  // ── QR Code ───────────────────────────────────────────────────────────────
+  let qrLoaded = false;
+
+  function loadQR() {
+    if (qrLoaded) return;
+    fetch(`/api/games/${gameId}/join-qr`)
+      .then(r => {
+        if (!r.ok) throw new Error('QR not available');
+        return r.text();
+      })
+      .then(svg => {
+        qrLoaded = true;
+        const container = document.getElementById('qr-img');
+        container.innerHTML = svg;
+
+        // Show the join URL beneath the QR code
+        const joinUrl = `${location.origin}/join/${gameId}`;
+        document.getElementById('qr-url').textContent = joinUrl;
+      })
+      .catch(() => {
+        document.getElementById('qr-img').innerHTML =
+          '<span style="color:#e94560;font-size:0.75rem;padding:4px;">QR unavailable</span>';
+      });
+  }
+
+  loadQR();
+
   function renderGame(state) {
     document.getElementById('connecting-msg')?.remove();
 
@@ -226,8 +345,11 @@
       banner.style.display = 'block';
       banner.textContent = winner ? `🏆 ${winner.name} WINS!` : '🏆 Game Over!';
       document.getElementById('turn-indicator').textContent = 'Game Over';
+      // Hide QR panel once game is over
+      document.getElementById('qr-panel').classList.add('hidden');
     } else {
       banner.style.display = 'none';
+      document.getElementById('qr-panel').classList.remove('hidden');
       const current = state.players.find(p => p.id === state.currentPlayerId);
       const dartsLeft = 3 - (state.dartsThrown || 0);
       document.getElementById('turn-indicator').textContent =

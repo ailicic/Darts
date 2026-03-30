@@ -238,21 +238,6 @@
     .btn-throw:active { transform: scale(0.97); }
     .btn-throw:disabled { background: #555; cursor: not-allowed; }
 
-    .btn-undo {
-      flex: 1;
-      background: transparent;
-      color: #a0a0d0;
-      border: 2px solid var(--border);
-      border-radius: 12px;
-      padding: 1rem;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .btn-undo:active { transform: scale(0.97); }
-
     .btn-end-turn {
       flex: 2;
       background: transparent;
@@ -344,7 +329,6 @@
   </div>
 
   <div class="action-row">
-    <button class="btn-undo" id="btn-undo">↩ Undo</button>
     <button class="btn-throw" id="btn-throw" disabled>Throw</button>
     <button class="btn-end-turn" id="btn-end-turn" disabled>End Turn</button>
   </div>
@@ -415,7 +399,7 @@
 
     renderTargetGrid(me, state);
     updateSlots();
-    updateActionButtons(isMyTurn, dartsLeft);
+    updateActionButtons(isMyTurn);
   }
 
   function showPlayArea() {
@@ -491,7 +475,8 @@
       const val = parseInt(btn.dataset.target, 10);
       btn.classList.toggle('selected', val === t);
     });
-    document.getElementById('btn-throw').disabled = false;
+    // Enable throw only if there are darts remaining this turn
+    document.getElementById('btn-throw').disabled = pendingThrows.length >= 3;
   }
 
   // ── Multiplier ───────────────────────────────────────────────────────────
@@ -544,15 +529,6 @@
     }
   });
 
-  // ── Undo (just local, before server confirms) ────────────────────────────
-
-  document.getElementById('btn-undo').addEventListener('click', () => {
-    // Note: undo only affects pending (not yet sent) optimistic state.
-    // The server already recorded throws; a future improvement would add server-side undo.
-    // For now, inform user.
-    showToast('Undo is not available after confirmation.');
-  });
-
   // ── End turn ─────────────────────────────────────────────────────────────
 
   document.getElementById('btn-end-turn').addEventListener('click', async () => {
@@ -600,7 +576,7 @@
     }
   }
 
-  function updateActionButtons(isMyTurn, dartsLeft) {
+  function updateActionButtons(isMyTurn) {
     const btnThrow = document.getElementById('btn-throw');
     const btnEnd = document.getElementById('btn-end-turn');
 
@@ -610,8 +586,8 @@
       return;
     }
 
-    // Throw button: enabled only when a target is selected and darts remain
-    btnThrow.disabled = selectedTarget === null || dartsLeft <= 0 || pendingThrows.length >= 3;
+    // Throw: enabled when a target is selected and fewer than 3 darts thrown this turn
+    btnThrow.disabled = selectedTarget === null || pendingThrows.length >= 3;
     // End turn: enabled any time during your turn
     btnEnd.disabled = false;
   }
