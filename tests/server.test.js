@@ -154,7 +154,109 @@ describe('GET /api/games/:gameId/join-qr', () => {
   });
 });
 
-// ── Page routes ────────────────────────────────────────────────────────────
+// ── POST /api/games/:gameId/bounce ─────────────────────────────────────────
+
+describe('POST /api/games/:gameId/bounce', () => {
+  test('reverts the last throw in the current turn', async () => {
+    const { gameId, players } = await createGame();
+
+    // Throw target 20 single → Alice gets 1 mark on 20
+    await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 20, multiplier: 1 });
+
+    // Bounce it
+    const res = await request(app)
+      .post(`/api/games/${gameId}/bounce`)
+      .send({ playerId: players[0].id });
+
+    expect(res.status).toBe(200);
+    expect(res.body.players[0].marks[20]).toBe(0);
+    expect(res.body.dartsThrown).toBe(0);
+    expect(res.body.currentTurnThrows).toHaveLength(0);
+  });
+
+  test('reverts score changes caused by the bounced throw', async () => {
+    const { gameId, players } = await createGame();
+
+    // Give Alice 2 marks on 20 via two single throws
+    await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 20, multiplier: 1 });
+    await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 20, multiplier: 1 });
+
+    // Third throw: triple → Alice closes 20 with 2 overflow → Bob +40
+    await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 20, multiplier: 3 });
+
+    // Verify Bob has 40 points
+    let state = await request(app).get(`/api/games/${gameId}`);
+    expect(state.body.players[1].score).toBe(40);
+
+    // Bounce the triple
+    const res = await request(app)
+      .post(`/api/games/${gameId}/bounce`)
+      .send({ playerId: players[0].id });
+
+    expect(res.status).toBe(200);
+    expect(res.body.players[0].marks[20]).toBe(2); // back to 2 marks
+    expect(res.body.players[1].score).toBe(0);     // Bob's penalty removed
+    expect(res.body.dartsThrown).toBe(2);
+  });
+
+  test('returns 409 when there are no throws to revert', async () => {
+    const { gameId, players } = await createGame();
+    const res = await request(app)
+      .post(`/api/games/${gameId}/bounce`)
+      .send({ playerId: players[0].id });
+    expect(res.status).toBe(409);
+  });
+
+  test("returns 403 when it is not the player's turn", async () => {
+    const { gameId, players } = await createGame();
+    const res = await request(app)
+      .post(`/api/games/${gameId}/bounce`)
+      .send({ playerId: players[1].id });
+    expect(res.status).toBe(403);
+  });
+
+  test('returns 404 for unknown game', async () => {
+    const res = await request(app)
+      .post('/api/games/no-such-game/bounce')
+      .send({ playerId: 'any' });
+    expect(res.status).toBe(404);
+  });
+
+  test('allows multiple sequential bounces', async () => {
+    const { gameId, players } = await createGame();
+
+    await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 20, multiplier: 1 });
+    await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 19, multiplier: 1 });
+
+    // Bounce throw 2
+    await request(app)
+      .post(`/api/games/${gameId}/bounce`)
+      .send({ playerId: players[0].id });
+
+    // Bounce throw 1
+    const res = await request(app)
+      .post(`/api/games/${gameId}/bounce`)
+      .send({ playerId: players[0].id });
+
+    expect(res.status).toBe(200);
+    expect(res.body.players[0].marks[20]).toBe(0);
+    expect(res.body.players[0].marks[19]).toBe(0);
+    expect(res.body.dartsThrown).toBe(0);
+  });
+});
+
 
 describe('Page routes', () => {
   test('GET / returns HTML', async () => {
