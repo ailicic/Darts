@@ -130,6 +130,8 @@ app.post('/api/games/:gameId/throw', (req, res) => {
     const winner = game.players.find(p => p.id === winnerId);
     if (winner) {
       wins.push({ playerName: winner.name, date: new Date().toISOString() });
+      // Keep the wins log from growing indefinitely
+      if (wins.length > 1000) wins.splice(0, wins.length - 1000);
     }
   }
 
