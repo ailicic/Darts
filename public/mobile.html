@@ -259,6 +259,22 @@
     .btn-end-turn:active { transform: scale(0.97); }
     .btn-end-turn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    .btn-bounce {
+      flex: 1;
+      background: transparent;
+      color: #a0a0d0;
+      border: 2px solid #2a2a5a;
+      border-radius: 12px;
+      padding: 1rem 0.4rem;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-bounce:active { transform: scale(0.97); }
+    .btn-bounce:disabled { opacity: 0.4; cursor: not-allowed; }
+
     /* Toast notification */
     #toast {
       position: fixed;
@@ -356,6 +372,7 @@
 
   <div class="action-row">
     <button class="btn-throw" id="btn-throw" disabled>Throw</button>
+    <button class="btn-bounce" id="btn-bounce" disabled aria-label="Undo last throw">↩ Bounce</button>
     <button class="btn-end-turn" id="btn-end-turn" disabled>End Turn</button>
   </div>
 </div>
@@ -648,6 +665,35 @@
     }
   });
 
+  // ── Bounce (undo last throw) ─────────────────────────────────────────────
+
+  document.getElementById('btn-bounce').addEventListener('click', async () => {
+    if (!gameState || gameState.currentPlayerId !== playerId) return;
+    if (pendingThrows.length === 0) return;
+
+    document.getElementById('btn-bounce').disabled = true;
+
+    try {
+      const res = await fetch(`/api/games/${gameId}/bounce`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Error reverting throw.');
+        document.getElementById('btn-bounce').disabled = pendingThrows.length === 0;
+        return;
+      }
+      pendingThrows.pop();
+      updateSlots();
+      applyState(data);
+    } catch {
+      showToast('Network error.');
+      document.getElementById('btn-bounce').disabled = pendingThrows.length === 0;
+    }
+  });
+
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   function updateSlots() {
@@ -669,16 +715,20 @@
 
   function updateActionButtons(isMyTurn) {
     const btnThrow = document.getElementById('btn-throw');
+    const btnBounce = document.getElementById('btn-bounce');
     const btnEnd = document.getElementById('btn-end-turn');
 
     if (!isMyTurn) {
       btnThrow.disabled = true;
+      btnBounce.disabled = true;
       btnEnd.disabled = true;
       return;
     }
 
     // Throw: enabled when a target is selected and fewer than 3 darts thrown this turn
     btnThrow.disabled = selectedTarget === null || pendingThrows.length >= 3;
+    // Bounce: enabled when there is at least one throw to revert this turn
+    btnBounce.disabled = pendingThrows.length === 0;
     // End turn: enabled any time during your turn
     btnEnd.disabled = false;
   }
