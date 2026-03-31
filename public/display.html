@@ -335,6 +335,8 @@
 
   loadQR();
 
+  let gameOverRedirectTimer = null;
+
   function renderGame(state) {
     document.getElementById('connecting-msg')?.remove();
 
@@ -347,6 +349,20 @@
       document.getElementById('turn-indicator').textContent = 'Game Over';
       // Hide QR panel once game is over
       document.getElementById('qr-panel').classList.add('hidden');
+
+      if (!gameOverRedirectTimer) {
+        let secs = 30;
+        gameOverRedirectTimer = setInterval(() => {
+          secs -= 1;
+          const winnerText = winner ? `🏆 ${winner.name} WINS!` : '🏆 Game Over!';
+          banner.textContent = `${winnerText} Returning to home in ${secs}s…`;
+          if (secs <= 0) {
+            clearInterval(gameOverRedirectTimer);
+            gameOverRedirectTimer = null;
+            location.href = '/';
+          }
+        }, 1000);
+      }
     } else {
       banner.style.display = 'none';
       document.getElementById('qr-panel').classList.remove('hidden');

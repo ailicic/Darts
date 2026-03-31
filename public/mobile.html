@@ -513,6 +513,8 @@
     updateSlots();
   }
 
+  let gameOverRedirectTimer = null;
+
   function showGameOver(state, me) {
     document.getElementById('play-area').style.display = 'none';
     document.getElementById('waiting-overlay').style.display = 'none';
@@ -527,6 +529,21 @@
       document.getElementById('game-over-title').textContent = 'Game Over';
       document.getElementById('game-over-msg').textContent =
         winner ? `${esc(winner.name)} wins with ${winner.score} points. Your score: ${me.score}.` : '';
+    }
+
+    if (!gameOverRedirectTimer) {
+      let secs = 30;
+      const msgEl = document.getElementById('game-over-msg');
+      const baseMsg = msgEl.textContent;
+      gameOverRedirectTimer = setInterval(() => {
+        secs -= 1;
+        msgEl.textContent = `${baseMsg} Returning to home in ${secs}s…`;
+        if (secs <= 0) {
+          clearInterval(gameOverRedirectTimer);
+          gameOverRedirectTimer = null;
+          location.href = '/';
+        }
+      }, 1000);
     }
   }
 
@@ -611,9 +628,14 @@
     pendingThrows.push({ target, multiplier });
     updateSlots();
 
-    // Reset selection
+    // Reset selection and multiplier back to Single
     selectedTarget = null;
+    selectedMul = 1;
     document.querySelectorAll('.target-btn').forEach(b => b.classList.remove('selected'));
+    document.querySelectorAll('.mul-btn').forEach(b => {
+      b.classList.toggle('selected', b.dataset.mul === '1');
+      b.disabled = false;
+    });
     document.getElementById('btn-throw').disabled = true;
 
     try {
