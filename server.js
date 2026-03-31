@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const fs = require('fs');
 const QRCode = require('qrcode');
 const rateLimit = require('express-rate-limit');
 
@@ -16,13 +17,34 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ── Persistent storage ────────────────────────────────────────────────────────
+const DATA_DIR = process.env.DATA_DIR || '/data';
+const WINS_FILE = path.join(DATA_DIR, 'wins.json');
+
+function loadWins() {
+  try {
+    const raw = fs.readFileSync(WINS_FILE, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function saveWins(winsData) {
+  const tmp = WINS_FILE + '.tmp';
+  fs.promises.mkdir(DATA_DIR, { recursive: true })
+    .then(() => fs.promises.writeFile(tmp, JSON.stringify(winsData), 'utf8'))
+    .then(() => fs.promises.rename(tmp, WINS_FILE))
+    .catch((err) => console.error('Failed to persist wins:', err));
+}
+
 // ── In-memory game store ──────────────────────────────────────────────────────
 // games[gameId] = { id, players[], currentPlayerIndex, turns[], gameOver, winnerId, createdAt }
 const games = {};
 
-// ── In-memory wins history ────────────────────────────────────────────────────
+// ── Wins history (loaded from disk on startup) ────────────────────────────────
 // wins = [{ playerName, date }]
-let wins = [];
+let wins = loadWins();
 
 // ── Helper: sanitize a player name ──────────────────────────────────────────
 function sanitizeName(name) {
@@ -140,6 +162,7 @@ app.post('/api/games/:gameId/throw', (req, res) => {
       wins.push({ playerName: winner.name, date: new Date().toISOString() });
       // Keep the wins log from growing indefinitely
       if (wins.length > 1000) wins = wins.slice(-1000);
+      saveWins(wins);
     }
   }
 
