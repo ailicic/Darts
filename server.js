@@ -8,6 +8,16 @@ const QRCode = require('qrcode');
 const rateLimit = require('express-rate-limit');
 
 const { createPlayer, processThrow, checkWinCondition, TARGETS } = require('./gameLogic');
+const {
+  httpRequestDuration,
+  httpRequestTotal,
+  activeGames,
+  activePlayers,
+  gameWinsTotal,
+  dartsThrown,
+  socketConnections,
+  register,
+} = require('./metrics');
 
 const app = express();
 const server = http.createServer(app);
@@ -59,6 +69,18 @@ function saveResults(resultsData) {
     .then(() => fs.promises.rename(tmp, RESULTS_FILE))
     .catch((err) => console.error('Failed to persist results:', err));
 }
+
+// ── Prometheus metrics middleware ──────────────────────────────────────────────
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = (Date.now() - start) / 1000;
+    const route = req.route?.path || req.path;
+    httpRequestDuration.labels(req.method, route, res.statusCode).observe(duration);
+    httpRequestTotal.labels(req.method, route, res.statusCode).inc();
+  });
+  next();
+});
 
 // ── In-memory game store ──────────────────────────────────────────────────────
 // games[gameId] = { id, players[], currentPlayerIndex, turns[], gameOver, winnerId, createdAt }
@@ -114,6 +136,9 @@ app.post('/api/games', (req, res) => {
     winnerId: null,
     createdAt: Date.now(),
   };
+
+  activeGames.set(Object.keys(games).length);
+  activePlayers.set(players.length);
 
   return res.status(201).json({
     gameId,
@@ -178,6 +203,8 @@ app.post('/api/games/:gameId/throw', (req, res) => {
   game.dartsThrown += 1;
   game.currentTurnThrows.push({ target: t, multiplier: m, result, snapshot });
 
+  dartsThrown.inc();
+
   const { gameOver, winnerId } = checkWinCondition(game.players);
 
   if (gameOver) {
@@ -189,6 +216,7 @@ app.post('/api/games/:gameId/throw', (req, res) => {
       wins.push({ playerName: winner.name, date: now });
       // Keep the wins log from growing indefinitely
       if (wins.length > 1000) wins = wins.slice(-1000);
+<<<<<<< HEAD
       saveWins(wins);
 
       // Record all participants so win% can be computed
@@ -199,7 +227,11 @@ app.post('/api/games/:gameId/throw', (req, res) => {
       });
       if (results.length > 1000) results = results.slice(-1000);
       saveResults(results);
+=======
+      gameWinsTotal.labels(winner.name).inc();
+>>>>>>> dc5654a (feat: add Prometheus and Grafana monitoring)
     }
+    activeGames.set(Math.max(0, Object.keys(games).length - 1));
   }
 
   // Emit real-time update to all clients watching this game
@@ -398,15 +430,27 @@ app.get('/api/games/:gameId/join-qr', async (req, res) => {
   }
 });
 
+// ── Metrics endpoint ──────────────────────────────────────────────────────────
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
+
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
 
 io.on('connection', (socket) => {
+  socketConnections.inc();
+
   socket.on('joinGame', ({ gameId: gid }) => {
     socket.join(gid);
     const game = games[gid];
     if (game) {
       socket.emit('gameUpdate', gameState(game));
     }
+  });
+
+  socket.on('disconnect', () => {
+    socketConnections.dec();
   });
 });
 
