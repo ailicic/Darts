@@ -216,7 +216,6 @@ app.post('/api/games/:gameId/throw', (req, res) => {
       wins.push({ playerName: winner.name, date: now });
       // Keep the wins log from growing indefinitely
       if (wins.length > 1000) wins = wins.slice(-1000);
-<<<<<<< HEAD
       saveWins(wins);
 
       // Record all participants so win% can be computed
@@ -227,9 +226,7 @@ app.post('/api/games/:gameId/throw', (req, res) => {
       });
       if (results.length > 1000) results = results.slice(-1000);
       saveResults(results);
-=======
       gameWinsTotal.labels(winner.name).inc();
->>>>>>> dc5654a (feat: add Prometheus and Grafana monitoring)
     }
     activeGames.set(Math.max(0, Object.keys(games).length - 1));
   }
