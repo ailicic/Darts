@@ -80,6 +80,76 @@
       margin-bottom: 1rem;
     }
 
+    /* ── Frequent Players ──────────────────────────────────────────────────── */
+    #frequent-section {
+      margin-bottom: 1.2rem;
+    }
+
+    #frequent-section h3 {
+      font-size: 0.95rem;
+      color: #a0a0c0;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: 0 0 0.7rem;
+    }
+
+    #frequent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .frequent-row {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.45rem 0.75rem;
+      border-radius: 8px;
+      background: #0f1e40;
+      border: 1.5px solid #2a2a5a;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .frequent-row:hover {
+      border-color: #e94560;
+      background: #12264a;
+    }
+
+    .frequent-row input[type="checkbox"] {
+      accent-color: #e94560;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .frequent-row .freq-name {
+      flex: 1;
+      font-weight: 600;
+      color: #e0e0ff;
+      font-size: 0.95rem;
+    }
+
+    .frequent-row .freq-stats {
+      font-size: 0.78rem;
+      color: #a0a0c0;
+    }
+
+    #frequent-section .no-frequent {
+      color: #555;
+      font-size: 0.9rem;
+      padding: 0.4rem 0;
+    }
+
+    .add-players-label {
+      font-size: 0.85rem;
+      color: #a0a0c0;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
     .player-row {
       display: flex;
       gap: 0.5rem;
@@ -249,10 +319,12 @@
       flex-shrink: 0;
     }
 
-    .sb-last-win {
-      font-size: 0.7rem;
-      color: #666;
+    .sb-pct {
+      font-size: 0.75rem;
+      color: #7878aa;
       flex-shrink: 0;
+      min-width: 38px;
+      text-align: right;
     }
 
     .sb-empty {
@@ -285,6 +357,14 @@
     <div class="center-column">
       <div class="card">
         <h2>New Game</h2>
+
+        <!-- Frequent players (top 6 by games played) -->
+        <div id="frequent-section">
+          <h3>⭐ Frequent Players</h3>
+          <div id="frequent-list"><div class="no-frequent">Loading…</div></div>
+        </div>
+
+        <div class="add-players-label">Additional Players</div>
         <div id="players-list"></div>
         <button class="btn-add" id="btn-add">+ Add Player</button>
         <div id="error-msg"></div>
@@ -334,9 +414,7 @@
       btn.textContent = '✕';
       btn.title = 'Remove player';
       btn.onclick = () => {
-        if (playersList.children.length > 2) {
-          row.remove();
-        }
+        row.remove();
       };
 
       row.appendChild(input);
@@ -344,25 +422,110 @@
       playersList.appendChild(row);
     }
 
-    // Start with 2 players
-    addPlayerRow('Player 1');
-    addPlayerRow('Player 2');
-
     btnAdd.addEventListener('click', () => {
       if (playersList.children.length < 8) {
         addPlayerRow('');
       }
     });
 
-    btnStart.addEventListener('click', async () => {
-      errorMsg.textContent = '';
-      const inputs = playersList.querySelectorAll('input');
-      const names = Array.from(inputs).map((i) => i.value.trim()).filter(Boolean);
+    // ── Frequent Players ────────────────────────────────────────────────────
 
-      if (names.length < 2) {
-        errorMsg.textContent = 'Please enter at least 2 player names.';
+    // Fisher-Yates shuffle – randomises the array in-place and returns it.
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function loadFrequentPlayers() {
+      fetch('/api/results')
+        .then(r => r.json())
+        .then(renderFrequentPlayers)
+        .catch(() => {
+          document.getElementById('frequent-list').innerHTML =
+            '<div class="no-frequent">Could not load players</div>';
+        });
+    }
+
+    function renderFrequentPlayers(results) {
+      const container = document.getElementById('frequent-list');
+
+      if (!results || results.length === 0) {
+        container.innerHTML = '<div class="no-frequent">No games played yet</div>';
         return;
       }
+
+      // Count games played and wins per player
+      const stats = {};
+      results.forEach(r => {
+        r.players.forEach(name => {
+          if (!stats[name]) stats[name] = { played: 0, wins: 0 };
+          stats[name].played++;
+        });
+        if (r.winner) {
+          if (!stats[r.winner]) stats[r.winner] = { played: 0, wins: 0 };
+          stats[r.winner].wins++;
+        }
+      });
+
+      // Top 6 by games played
+      const top6 = Object.entries(stats)
+        .sort((a, b) => b[1].played - a[1].played)
+        .slice(0, 6);
+
+      if (top6.length === 0) {
+        container.innerHTML = '<div class="no-frequent">No games played yet</div>';
+        return;
+      }
+
+      container.innerHTML = top6.map(([name, { played, wins }]) => {
+        const pct = played > 0 ? Math.round((wins / played) * 100) : 0;
+        return `
+          <label class="frequent-row">
+            <input type="checkbox" class="frequent-cb" value="${escapeAttr(name)}" />
+            <span class="freq-name">${escapeHtml(name)}</span>
+            <span class="freq-stats">${wins}W / ${played}G &nbsp; ${pct}%</span>
+          </label>
+        `;
+      }).join('');
+    }
+
+    loadFrequentPlayers();
+
+    // ── Start Game ──────────────────────────────────────────────────────────
+
+    btnStart.addEventListener('click', async () => {
+      errorMsg.textContent = '';
+
+      // Collect checked frequent players
+      const checkedNames = Array.from(
+        document.querySelectorAll('.frequent-cb:checked')
+      ).map(cb => cb.value.trim()).filter(Boolean);
+
+      // Collect additional typed names
+      const typedNames = Array.from(playersList.querySelectorAll('input'))
+        .map(i => i.value.trim()).filter(Boolean);
+
+      // Merge, deduplicate (case-insensitive), preserve first occurrence
+      const seen = new Set();
+      const names = [];
+      [...checkedNames, ...typedNames].forEach(n => {
+        const key = n.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          names.push(n);
+        }
+      });
+
+      if (names.length < 2) {
+        errorMsg.textContent = 'Please select or enter at least 2 players.';
+        return;
+      }
+
+      // Randomise player order
+      shuffle(names);
 
       btnStart.disabled = true;
       btnStart.textContent = 'Starting…';
@@ -433,7 +596,11 @@
     }
 
     function escapeHtml(str) {
-      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function escapeAttr(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
     // ── Scoreboards ──────────────────────────────────────────────────────
@@ -446,55 +613,59 @@
              d.getDate() === now.getDate();
     }
 
-    function formatTime(isoDate) {
-      return new Date(isoDate).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    }
-
     function rankEmoji(i) {
       return ['🥇','🥈','🥉'][i] || `${i + 1}.`;
     }
 
-    function renderScoreboards(wins) {
+    function renderScoreboards(results) {
       const sbTodayBody = document.getElementById('sb-today-body');
       const sbAlltimeBody = document.getElementById('sb-alltime-body');
       const sbTodayDate = document.getElementById('sb-today-date');
 
       sbTodayDate.textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-      // Filter today's wins
-      const todayWins = wins.filter(w => isSameDay(w.date));
+      // Filter today's results
+      const todayResults = results.filter(r => isSameDay(r.date));
 
-      // Group by player
-      function buildScoreboard(winsList) {
-        if (winsList.length === 0) {
+      function buildScoreboard(resultsList) {
+        if (resultsList.length === 0) {
           return '<div class="sb-empty">No games yet</div>';
         }
 
-        const map = {};
-        winsList.forEach(w => {
-          if (!map[w.playerName]) map[w.playerName] = { count: 0, lastDate: w.date };
-          map[w.playerName].count++;
-          if (w.date > map[w.playerName].lastDate) map[w.playerName].lastDate = w.date;
+        const stats = {};
+        resultsList.forEach(r => {
+          r.players.forEach(name => {
+            if (!stats[name]) stats[name] = { wins: 0, played: 0 };
+            stats[name].played++;
+          });
+          if (r.winner) {
+            if (!stats[r.winner]) stats[r.winner] = { wins: 0, played: 0 };
+            stats[r.winner].wins++;
+          }
         });
 
-        const sorted = Object.entries(map).sort((a, b) => b[1].count - a[1].count);
+        const sorted = Object.entries(stats).sort((a, b) => b[1].wins - a[1].wins);
 
-        return sorted.map(([name, { count, lastDate }], i) => `
-          <div class="sb-row">
-            <span class="sb-rank">${rankEmoji(i)}</span>
-            <span class="sb-name">${escapeHtml(name)}</span>
-            <span class="sb-wins">${count}</span>
-            <span class="sb-wins-label">W</span>
-          </div>
-        `).join('');
+        return sorted.map(([name, { wins, played }], i) => {
+          const pct = played > 0 ? Math.round((wins / played) * 100) : 0;
+          return `
+            <div class="sb-row">
+              <span class="sb-rank">${rankEmoji(i)}</span>
+              <span class="sb-name">${escapeHtml(name)}</span>
+              <span class="sb-wins">${wins}</span>
+              <span class="sb-wins-label">W</span>
+              <span class="sb-pct">${pct}%</span>
+            </div>
+          `;
+        }).join('');
       }
 
-      sbTodayBody.innerHTML = buildScoreboard(todayWins);
-      sbAlltimeBody.innerHTML = buildScoreboard(wins);
+      sbTodayBody.innerHTML = buildScoreboard(todayResults);
+      sbAlltimeBody.innerHTML = buildScoreboard(results);
     }
 
     function loadScorecards() {
-      fetch('/api/wins')
+      fetch('/api/results')
         .then(r => r.json())
         .then(renderScoreboards)
         .catch(() => {

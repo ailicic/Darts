@@ -20,6 +20,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── Persistent storage ────────────────────────────────────────────────────────
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const WINS_FILE = path.join(DATA_DIR, 'wins.json');
+const RESULTS_FILE = path.join(DATA_DIR, 'results.json');
 
 function loadWins() {
   try {
@@ -38,6 +39,27 @@ function saveWins(winsData) {
     .catch((err) => console.error('Failed to persist wins:', err));
 }
 
+/**
+ * results = [{ players: string[], winner: string, date: string }]
+ * Tracks all participants of every completed game so we can compute win%.
+ */
+function loadResults() {
+  try {
+    const raw = fs.readFileSync(RESULTS_FILE, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function saveResults(resultsData) {
+  const tmp = RESULTS_FILE + '.tmp';
+  fs.promises.mkdir(DATA_DIR, { recursive: true })
+    .then(() => fs.promises.writeFile(tmp, JSON.stringify(resultsData), 'utf8'))
+    .then(() => fs.promises.rename(tmp, RESULTS_FILE))
+    .catch((err) => console.error('Failed to persist results:', err));
+}
+
 // ── In-memory game store ──────────────────────────────────────────────────────
 // games[gameId] = { id, players[], currentPlayerIndex, turns[], gameOver, winnerId, createdAt }
 const games = {};
@@ -45,6 +67,10 @@ const games = {};
 // ── Wins history (loaded from disk on startup) ────────────────────────────────
 // wins = [{ playerName, date }]
 let wins = loadWins();
+
+// ── Game results (loaded from disk on startup) ────────────────────────────────
+// results = [{ players: string[], winner: string, date: string }]
+let results = loadResults();
 
 // ── Helper: sanitize a player name ──────────────────────────────────────────
 function sanitizeName(name) {
@@ -159,10 +185,20 @@ app.post('/api/games/:gameId/throw', (req, res) => {
     game.winnerId = winnerId;
     const winner = game.players.find(p => p.id === winnerId);
     if (winner) {
-      wins.push({ playerName: winner.name, date: new Date().toISOString() });
+      const now = new Date().toISOString();
+      wins.push({ playerName: winner.name, date: now });
       // Keep the wins log from growing indefinitely
       if (wins.length > 1000) wins = wins.slice(-1000);
       saveWins(wins);
+
+      // Record all participants so win% can be computed
+      results.push({
+        players: game.players.map(p => p.name),
+        winner: winner.name,
+        date: now,
+      });
+      if (results.length > 1000) results = results.slice(-1000);
+      saveResults(results);
     }
   }
 
@@ -304,6 +340,15 @@ app.get('/api/wins', (req, res) => {
   res.json(wins);
 });
 
+/**
+ * GET /api/results
+ * Returns all game results: [{ players: string[], winner: string, date: string }]
+ * Used to compute win% and frequent players.
+ */
+app.get('/api/results', (req, res) => {
+  res.json(results);
+});
+
 const pageRateLimit = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 120,            // up to 120 page loads per minute per IP
@@ -389,4 +434,4 @@ server.listen(PORT, () => {
   console.log(`Darts server running on http://localhost:${PORT}`);
 });
 
-module.exports = { app, server, games, wins };
+module.exports = { app, server, games, wins, results };
