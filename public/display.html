@@ -263,6 +263,114 @@
     #btn-toggle-qr.qr-visible {
       display: none; /* only show toggle after QR panel is hidden */
     }
+
+    /* ── Reset button ────────────────────────────────────────────────────────── */
+    #btn-reset {
+      background: transparent;
+      border: 1.5px solid #e94560;
+      color: #e94560;
+      border-radius: 8px;
+      padding: 0.4rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    #btn-reset:hover {
+      background: rgba(233, 69, 96, 0.12);
+    }
+
+    /* ── Reset modal ─────────────────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    .modal-box {
+      background: #16213e;
+      border: 2px solid #2a2a5a;
+      border-radius: 16px;
+      padding: 2rem;
+      max-width: 380px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    }
+
+    .modal-box h3 {
+      font-size: 1.4rem;
+      color: #e0e0ff;
+      margin-bottom: 0.6rem;
+    }
+
+    .modal-box p {
+      color: #a0a0d0;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .modal-btn-row {
+      display: flex;
+      gap: 0.8rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .modal-btn {
+      flex: 1;
+      padding: 0.75rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .modal-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .modal-btn.primary {
+      background: #e94560;
+      color: #fff;
+      border: none;
+    }
+
+    .modal-btn.primary:hover:not(:disabled) {
+      background: #c73652;
+    }
+
+    .modal-btn.secondary {
+      background: transparent;
+      color: #e94560;
+      border: 1.5px solid #e94560;
+    }
+
+    .modal-btn.secondary:hover:not(:disabled) {
+      background: rgba(233, 69, 96, 0.1);
+    }
+
+    .modal-btn-cancel {
+      background: transparent;
+      border: none;
+      color: #666;
+      font-size: 0.9rem;
+      cursor: pointer;
+      padding: 0.4rem;
+      width: 100%;
+      transition: color 0.15s;
+    }
+
+    .modal-btn-cancel:hover {
+      color: #aaa;
+    }
   </style>
 </head>
 <body>
@@ -287,8 +395,24 @@
 </div>
 
 <div class="feed-panel">
-  <h3>Recent Throws</h3>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+    <h3>Recent Throws</h3>
+    <button id="btn-reset">🔄 Reset</button>
+  </div>
   <div id="throw-feed"><span style="color:#555">—</span></div>
+</div>
+
+<!-- Reset confirmation modal -->
+<div id="reset-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="reset-modal-title">
+  <div class="modal-box">
+    <h3 id="reset-modal-title">Reset Game?</h3>
+    <p>Keep the same players (scores reset to 0) or start fresh with new players?</p>
+    <div class="modal-btn-row">
+      <button class="modal-btn secondary" id="btn-reset-same">👥 Same Players</button>
+      <button class="modal-btn primary" id="btn-reset-new">🏠 New Players</button>
+    </div>
+    <button class="modal-btn-cancel" id="btn-cancel-reset">Cancel</button>
+  </div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -461,6 +585,50 @@
   function esc(str) {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
+
+  // ── Reset modal ────────────────────────────────────────────────────────────
+
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    document.getElementById('reset-modal').style.display = 'flex';
+  });
+
+  document.getElementById('btn-cancel-reset').addEventListener('click', () => {
+    document.getElementById('reset-modal').style.display = 'none';
+  });
+
+  // Close modal when clicking outside the box
+  document.getElementById('reset-modal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('reset-modal')) {
+      document.getElementById('reset-modal').style.display = 'none';
+    }
+  });
+
+  document.getElementById('btn-reset-new').addEventListener('click', () => {
+    location.href = '/';
+  });
+
+  document.getElementById('btn-reset-same').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-reset-same');
+    btn.disabled = true;
+    btn.textContent = 'Resetting…';
+
+    try {
+      const res = await fetch(`/api/games/${gameId}/reset`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        location.href = '/';
+        return;
+      }
+      // Stop any existing game-over redirect timer before navigating
+      if (gameOverRedirectTimer) {
+        clearInterval(gameOverRedirectTimer);
+        gameOverRedirectTimer = null;
+      }
+      location.href = `/display/${data.gameId}`;
+    } catch {
+      location.href = '/';
+    }
+  });
 </script>
 </body>
 </html>

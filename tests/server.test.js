@@ -257,6 +257,67 @@ describe('POST /api/games/:gameId/bounce', () => {
   });
 });
 
+// ── POST /api/games/:gameId/reset ──────────────────────────────────────────
+
+describe('POST /api/games/:gameId/reset', () => {
+  test('creates a new game with the same player names', async () => {
+    const { gameId, players } = await createGame(['Alice', 'Bob']);
+    const res = await request(app).post(`/api/games/${gameId}/reset`);
+
+    expect(res.status).toBe(201);
+    expect(res.body.gameId).toBeDefined();
+    expect(res.body.gameId).not.toBe(gameId);
+    expect(res.body.players).toHaveLength(2);
+    expect(res.body.players[0].name).toBe('Alice');
+    expect(res.body.players[1].name).toBe('Bob');
+  });
+
+  test('new game has fresh scores (reset to 0)', async () => {
+    const { gameId, players } = await createGame(['Alice', 'Bob']);
+
+    // Record some throws so score state is non-trivial
+    await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 20, multiplier: 1 });
+
+    const resetRes = await request(app).post(`/api/games/${gameId}/reset`);
+    expect(resetRes.status).toBe(201);
+
+    const newGameId = resetRes.body.gameId;
+    const state = await request(app).get(`/api/games/${newGameId}`);
+
+    expect(state.status).toBe(200);
+    expect(state.body.gameOver).toBe(false);
+    expect(state.body.dartsThrown).toBe(0);
+    state.body.players.forEach((p) => {
+      expect(p.score).toBe(0);
+    });
+  });
+
+  test('new game assigns fresh player IDs', async () => {
+    const { gameId, players } = await createGame(['Alice', 'Bob']);
+    const res = await request(app).post(`/api/games/${gameId}/reset`);
+
+    expect(res.status).toBe(201);
+    const newIds = res.body.players.map((p) => p.id);
+    const oldIds = players.map((p) => p.id);
+    newIds.forEach((id) => expect(oldIds).not.toContain(id));
+  });
+
+  test('returns 404 for unknown game', async () => {
+    const res = await request(app).post('/api/games/no-such-game/reset');
+    expect(res.status).toBe(404);
+  });
+
+  test('original game is still accessible after reset', async () => {
+    const { gameId } = await createGame(['Alice', 'Bob']);
+    await request(app).post(`/api/games/${gameId}/reset`);
+
+    const state = await request(app).get(`/api/games/${gameId}`);
+    expect(state.status).toBe(200);
+  });
+});
+
 
 describe('Page routes', () => {
   test('GET / returns HTML', async () => {

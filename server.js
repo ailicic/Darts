@@ -242,6 +242,38 @@ app.post('/api/games/:gameId/claim/:playerId', (req, res) => {
 });
 
 /**
+ * POST /api/games/:gameId/reset
+ * Creates a fresh game with the same player names and returns { gameId, players }.
+ * The original game is left intact so existing display/mobile links don't crash.
+ */
+app.post('/api/games/:gameId/reset', (req, res) => {
+  const game = games[req.params.gameId];
+  if (!game) return res.status(404).json({ error: 'Game not found.' });
+
+  const playerNames = game.players.map((p) => p.name);
+  const newGameId = uuidv4();
+  const players = playerNames.map((name) => createPlayer(uuidv4(), name));
+
+  games[newGameId] = {
+    id: newGameId,
+    players,
+    currentPlayerIndex: 0,
+    dartsThrown: 0,
+    turnHistory: [],
+    currentTurnThrows: [],
+    claimedPlayerIds: new Set(),
+    gameOver: false,
+    winnerId: null,
+    createdAt: Date.now(),
+  };
+
+  return res.status(201).json({
+    gameId: newGameId,
+    players: players.map(({ id, name }) => ({ id, name })),
+  });
+});
+
+/**
  * GET /api/wins
  * Returns the all-time wins history: [{ playerName, date }]
  */
