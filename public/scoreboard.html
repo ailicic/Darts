@@ -79,6 +79,13 @@
       line-height: 1.1;
     }
 
+    .summary-card .win-pct {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #a0a0d0;
+      margin-top: 0.15rem;
+    }
+
     .summary-card .player-name {
       font-size: 1rem;
       font-weight: 700;
@@ -178,39 +185,51 @@
     });
   }
 
-  fetch('/api/wins')
+  fetch('/api/results')
     .then(r => r.json())
-    .then(wins => {
+    .then(results => {
       const container = document.getElementById('history-container');
       const summaryGrid = document.getElementById('summary-grid');
 
-      if (!wins || wins.length === 0) {
+      if (!results || results.length === 0) {
         summaryGrid.innerHTML = '';
         container.innerHTML = '<div id="empty-msg">No games completed yet. Play some darts! 🎯</div>';
         return;
       }
 
-      // Build summary: wins per player
-      const counts = {};
-      wins.forEach(w => {
-        counts[w.playerName] = (counts[w.playerName] || 0) + 1;
+      // Build per-player stats: wins + games played
+      const stats = {};
+      results.forEach(r => {
+        r.players.forEach(name => {
+          if (!stats[name]) stats[name] = { wins: 0, played: 0 };
+          stats[name].played++;
+        });
+        if (r.winner) {
+          if (!stats[r.winner]) stats[r.winner] = { wins: 0, played: 0 };
+          stats[r.winner].wins++;
+        }
       });
 
       // Sort by wins descending
-      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-      summaryGrid.innerHTML = sorted.map(([name, count]) => `
-        <div class="summary-card">
-          <div class="wins-count">${count}</div>
-          <div class="wins-label">win${count !== 1 ? 's' : ''}</div>
-          <div class="player-name">${esc(name)}</div>
-        </div>
-      `).join('');
+      const sorted = Object.entries(stats).sort((a, b) => b[1].wins - a[1].wins);
+      summaryGrid.innerHTML = sorted.map(([name, { wins, played }]) => {
+        const pct = played > 0 ? Math.round((wins / played) * 100) : 0;
+        return `
+          <div class="summary-card">
+            <div class="wins-count">${wins}</div>
+            <div class="wins-label">win${wins !== 1 ? 's' : ''}</div>
+            <div class="win-pct">${pct}% (${played} games)</div>
+            <div class="player-name">${esc(name)}</div>
+          </div>
+        `;
+      }).join('');
 
       // History table – most recent first
-      const rows = [...wins].reverse().map(w => `
+      const rows = [...results].reverse().map(r => `
         <tr>
-          <td class="winner-name">🏆 ${esc(w.playerName)}</td>
-          <td>${esc(formatDate(w.date))}</td>
+          <td class="winner-name">🏆 ${esc(r.winner || '—')}</td>
+          <td>${esc(r.players.map(p => p).join(', '))}</td>
+          <td>${esc(formatDate(r.date))}</td>
         </tr>
       `).join('');
 
@@ -219,6 +238,7 @@
           <thead>
             <tr>
               <th>Winner</th>
+              <th>Players</th>
               <th>Date</th>
             </tr>
           </thead>

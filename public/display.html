@@ -281,7 +281,7 @@
       background: rgba(233, 69, 96, 0.12);
     }
 
-    /* ── Reset modal ─────────────────────────────────────────────────────────── */
+    /* ── Shared modal styles ─────────────────────────────────────────────────── */
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -371,6 +371,28 @@
     .modal-btn-cancel:hover {
       color: #aaa;
     }
+
+    /* ── Countdown bar ───────────────────────────────────────────────────────── */
+    .countdown-bar-wrap {
+      margin-top: 1rem;
+      background: #2a2a5a;
+      border-radius: 99px;
+      height: 6px;
+      overflow: hidden;
+    }
+
+    .countdown-bar {
+      height: 100%;
+      background: #e94560;
+      border-radius: 99px;
+      transition: width 1s linear;
+    }
+
+    .countdown-text {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: #666;
+    }
   </style>
 </head>
 <body>
@@ -412,6 +434,22 @@
       <button class="modal-btn primary" id="btn-reset-new">🏠 New Players</button>
     </div>
     <button class="modal-btn-cancel" id="btn-cancel-reset">Cancel</button>
+  </div>
+</div>
+
+<!-- Post-game modal -->
+<div id="postgame-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="postgame-modal-title">
+  <div class="modal-box">
+    <h3 id="postgame-modal-title">🏆 Game Over!</h3>
+    <p id="postgame-winner-text">What would you like to do next?</p>
+    <div class="modal-btn-row">
+      <button class="modal-btn secondary" id="btn-repeat-match">🔄 Repeat Match</button>
+      <button class="modal-btn primary" id="btn-new-players">🏠 New Players</button>
+    </div>
+    <div class="countdown-bar-wrap">
+      <div class="countdown-bar" id="postgame-bar" style="width:100%"></div>
+    </div>
+    <div class="countdown-text" id="postgame-countdown">Redirecting to home in 30s…</div>
   </div>
 </div>
 
@@ -459,7 +497,42 @@
 
   loadQR();
 
-  let gameOverRedirectTimer = null;
+  let gameOverHandled = false;
+  let postGameTimer = null;
+
+  function showPostGameModal(winner) {
+    if (gameOverHandled) return;
+    gameOverHandled = true;
+
+    const modal = document.getElementById('postgame-modal');
+    const winnerText = document.getElementById('postgame-winner-text');
+    const countdownEl = document.getElementById('postgame-countdown');
+    const bar = document.getElementById('postgame-bar');
+
+    winnerText.textContent = winner
+      ? `${winner.name} wins! What would you like to do next?`
+      : 'What would you like to do next?';
+
+    modal.style.display = 'flex';
+
+    let secs = 30;
+    bar.style.width = '100%';
+    // Force reflow so the browser registers the initial width:100% before
+    // transitioning to width:0%; without this the CSS transition may not animate.
+    void bar.offsetWidth;
+    bar.style.width = '0%';
+
+    countdownEl.textContent = `Redirecting to home in ${secs}s…`;
+    postGameTimer = setInterval(() => {
+      secs -= 1;
+      countdownEl.textContent = `Redirecting to home in ${secs}s…`;
+      if (secs <= 0) {
+        clearInterval(postGameTimer);
+        postGameTimer = null;
+        location.href = '/';
+      }
+    }, 1000);
+  }
 
   function renderGame(state) {
     document.getElementById('connecting-msg')?.remove();
@@ -474,19 +547,7 @@
       // Hide QR panel once game is over
       document.getElementById('qr-panel').classList.add('hidden');
 
-      if (!gameOverRedirectTimer) {
-        let secs = 30;
-        gameOverRedirectTimer = setInterval(() => {
-          secs -= 1;
-          const winnerText = winner ? `🏆 ${winner.name} WINS!` : '🏆 Game Over!';
-          banner.textContent = `${winnerText} Returning to home in ${secs}s…`;
-          if (secs <= 0) {
-            clearInterval(gameOverRedirectTimer);
-            gameOverRedirectTimer = null;
-            location.href = '/';
-          }
-        }, 1000);
-      }
+      showPostGameModal(winner || null);
     } else {
       banner.style.display = 'none';
       document.getElementById('qr-panel').classList.remove('hidden');
@@ -619,15 +680,48 @@
         location.href = '/';
         return;
       }
-      // Stop any existing game-over redirect timer before navigating
-      if (gameOverRedirectTimer) {
-        clearInterval(gameOverRedirectTimer);
-        gameOverRedirectTimer = null;
+      // Stop any existing post-game timer before navigating
+      if (postGameTimer) {
+        clearInterval(postGameTimer);
+        postGameTimer = null;
       }
       location.href = `/display/${data.gameId}`;
     } catch {
       location.href = '/';
     }
+  });
+
+  // ── Post-game modal ────────────────────────────────────────────────────────
+
+  document.getElementById('btn-repeat-match').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-repeat-match');
+    btn.disabled = true;
+    btn.textContent = 'Restarting…';
+
+    if (postGameTimer) {
+      clearInterval(postGameTimer);
+      postGameTimer = null;
+    }
+
+    try {
+      const res = await fetch(`/api/games/${gameId}/reset`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        location.href = '/';
+        return;
+      }
+      location.href = `/display/${data.gameId}`;
+    } catch {
+      location.href = '/';
+    }
+  });
+
+  document.getElementById('btn-new-players').addEventListener('click', () => {
+    if (postGameTimer) {
+      clearInterval(postGameTimer);
+      postGameTimer = null;
+    }
+    location.href = '/';
   });
 </script>
 </body>
