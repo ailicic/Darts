@@ -7,4 +7,9 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
+    volumes:
+      - darts-data:/data
     restart: unless-stopped
+
+volumes:
+  darts-data:

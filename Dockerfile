@@ -12,6 +12,9 @@ COPY --chown=darts:darts node_modules ./node_modules
 COPY --chown=darts:darts gameLogic.js server.js ./
 COPY --chown=darts:darts public ./public
 
+# Create the persistent data directory and ensure the darts user owns it
+RUN mkdir -p /data && chown darts:darts /data
+
 USER darts
 
 EXPOSE 3000
