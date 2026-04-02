@@ -405,6 +405,32 @@ app.get('/scoreboard', pageRateLimit, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'scoreboard.html'));
 });
 
+app.get('/shared/:gameId', pageRateLimit, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'shared.html'));
+});
+
+/**
+ * GET /api/games/:gameId/shared-qr
+ * Returns an SVG QR code whose content is the shared tablet URL for this game.
+ * The shared URL points to /shared/:gameId so any device can score for all players.
+ */
+app.get('/api/games/:gameId/shared-qr', async (req, res) => {
+  const game = games[req.params.gameId];
+  if (!game) return res.status(404).json({ error: 'Game not found.' });
+
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.get('host');
+  const sharedUrl = `${proto}://${host}/shared/${req.params.gameId}`;
+
+  try {
+    const svg = await QRCode.toString(sharedUrl, { type: 'svg', margin: 2, width: 250 });
+    res.set('Content-Type', 'image/svg+xml');
+    res.send(svg);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate QR code.' });
+  }
+});
+
 /**
  * GET /api/games/:gameId/join-qr
  * Returns an SVG QR code whose content is the join URL for this game.

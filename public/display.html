@@ -241,6 +241,67 @@
       max-width: 160px;
     }
 
+    /* ── Shared Tablet QR Panel ─────────────────────────────────────────────── */
+    #shared-qr-panel {
+      position: fixed;
+      bottom: 80px;
+      right: 210px; /* to the left of the join QR panel */
+      background: #16213e;
+      border: 2px solid #2a4a2a;
+      border-radius: 16px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      z-index: 10;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      transition: opacity 0.3s;
+    }
+
+    #shared-qr-panel.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #shared-qr-panel .qr-title {
+      color: #80ff80;
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    #shared-qr-panel .qr-label {
+      color: #a0a0d0;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+
+    #shared-qr-img {
+      width: 160px;
+      height: 160px;
+      border-radius: 8px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #shared-qr-img svg {
+      width: 160px;
+      height: 160px;
+    }
+
+    #shared-qr-panel .qr-url {
+      color: #666;
+      font-size: 0.7rem;
+      text-align: center;
+      word-break: break-all;
+      max-width: 160px;
+    }
+
     #btn-toggle-qr {
       position: fixed;
       bottom: 80px;
@@ -412,6 +473,14 @@
   <div class="qr-url" id="qr-url"></div>
 </div>
 
+<!-- Shared tablet QR – scan to open shared scoring tablet -->
+<div id="shared-qr-panel">
+  <div class="qr-title">🖥️ Shared Tablet</div>
+  <div id="shared-qr-img"><span style="color:#555;font-size:0.8rem">Loading…</span></div>
+  <div class="qr-label">Score for any player</div>
+  <div class="qr-url" id="shared-qr-url"></div>
+</div>
+
 <div id="main-content">
   <div class="connecting" id="connecting-msg">Connecting to game…</div>
 </div>
@@ -495,7 +564,31 @@
       });
   }
 
+  let sharedQrLoaded = false;
+
+  function loadSharedQR() {
+    if (sharedQrLoaded) return;
+    fetch(`/api/games/${gameId}/shared-qr`)
+      .then(r => {
+        if (!r.ok) throw new Error('QR not available');
+        return r.text();
+      })
+      .then(svg => {
+        sharedQrLoaded = true;
+        const container = document.getElementById('shared-qr-img');
+        container.innerHTML = svg;
+
+        const sharedUrl = `${location.origin}/shared/${gameId}`;
+        document.getElementById('shared-qr-url').textContent = sharedUrl;
+      })
+      .catch(() => {
+        document.getElementById('shared-qr-img').innerHTML =
+          '<span style="color:#e94560;font-size:0.75rem;padding:4px;">QR unavailable</span>';
+      });
+  }
+
   loadQR();
+  loadSharedQR();
 
   let gameOverHandled = false;
   let postGameTimer = null;
@@ -544,13 +637,15 @@
       banner.style.display = 'block';
       banner.textContent = winner ? `🏆 ${winner.name} WINS!` : '🏆 Game Over!';
       document.getElementById('turn-indicator').textContent = 'Game Over';
-      // Hide QR panel once game is over
+      // Hide QR panels once game is over
       document.getElementById('qr-panel').classList.add('hidden');
+      document.getElementById('shared-qr-panel').classList.add('hidden');
 
       showPostGameModal(winner || null);
     } else {
       banner.style.display = 'none';
       document.getElementById('qr-panel').classList.remove('hidden');
+      document.getElementById('shared-qr-panel').classList.remove('hidden');
       const current = state.players.find(p => p.id === state.currentPlayerId);
       const dartsLeft = 3 - (state.dartsThrown || 0);
       document.getElementById('turn-indicator').textContent =
