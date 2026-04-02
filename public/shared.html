@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Darts – Shared Tablet</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red: #e94560;
+      --bg: #0d0d1a;
+      --card: #16213e;
+      --input-bg: #0f3460;
+      --border: #2a2a5a;
+      --green: #3a8a3a;
+      --green-text: #80ff80;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      background: var(--bg);
+      color: #eee;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────────── */
+    header {
+      background: var(--card);
+      border-bottom: 2px solid var(--red);
+      padding: 0.5rem 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--red);
+    }
+
+    #current-turn-banner {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #a0d0ff;
+      text-align: center;
+      flex: 1;
+      padding: 0 1rem;
+    }
+
+    #current-turn-banner .turn-name {
+      color: #e0e0ff;
+    }
+
+    #darts-left-badge {
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.25rem 0.75rem;
+      font-size: 0.9rem;
+      color: #a0d0ff;
+      white-space: nowrap;
+    }
+
+    /* ── Main layout (landscape two-column) ─────────────────────────────────── */
+    #main-layout {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Left: scoreboard ───────────────────────────────────────────────────── */
+    #scoreboard-panel {
+      width: 38%;
+      border-right: 2px solid var(--border);
+      overflow-y: auto;
+      padding: 0.6rem;
+    }
+
+    .scoreboard-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .scoreboard-table th,
+    .scoreboard-table td {
+      text-align: center;
+      padding: 0.35rem 0.4rem;
+      border: 1px solid var(--border);
+    }
+
+    .scoreboard-table thead th {
+      background: var(--card);
+      color: #a0a0d0;
+      font-size: 0.8rem;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    .scoreboard-table thead th.player-col {
+      color: #e0e0ff;
+    }
+
+    .scoreboard-table thead th.player-col.active-turn {
+      color: #a0d0ff;
+      background: #1a2a4a;
+    }
+
+    .scoreboard-table .target-col {
+      background: #12122a;
+      color: #c0c0e0;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .scoreboard-table td.marks-cell {
+      font-size: 1.1rem;
+      letter-spacing: 1px;
+    }
+
+    .scoreboard-table td.marks-cell.closed {
+      background: rgba(100,230,100,0.08);
+      color: var(--green-text);
+    }
+
+    .scoreboard-table tr.score-row td {
+      background: var(--card);
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .score-value { color: var(--red); }
+
+    /* ── Right: controls ────────────────────────────────────────────────────── */
+    #controls-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 0.6rem 0.8rem;
+      gap: 0.5rem;
+      overflow: hidden;
+    }
+
+    /* Target grid */
+    .section-label {
+      color: #a0a0d0;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .target-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.4rem;
+    }
+
+    .target-btn {
+      background: var(--input-bg);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 0.6rem 0.3rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #eee;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.15rem;
+      transition: all 0.12s;
+    }
+
+    .target-btn:active { transform: scale(0.93); }
+
+    .target-btn.selected {
+      border-color: var(--red);
+      background: rgba(233,69,96,0.18);
+    }
+
+    .target-btn.closed {
+      border-color: var(--green);
+      background: rgba(80,200,80,0.06);
+      color: var(--green-text);
+    }
+
+    .target-btn .marks-indicator {
+      font-size: 0.75rem;
+      color: #a0a0d0;
+      letter-spacing: 1px;
+    }
+
+    .target-btn.closed .marks-indicator {
+      color: var(--green-text);
+    }
+
+    .target-btn.miss-btn {
+      background: #1a0a0a;
+      border-color: #4a2a2a;
+      color: var(--red);
+    }
+
+    .target-btn.miss-btn.selected {
+      border-color: var(--red);
+      background: rgba(233,69,96,0.2);
+    }
+
+    /* Multiplier */
+    .multiplier-row {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .mul-btn {
+      flex: 1;
+      background: var(--input-bg);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 0.55rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #eee;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.12s;
+    }
+
+    .mul-btn:active { transform: scale(0.95); }
+
+    .mul-btn.selected {
+      border-color: var(--red);
+      background: rgba(233,69,96,0.15);
+      color: var(--red);
+    }
+
+    .mul-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* Throw slots */
+    .throw-queue {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .throw-slot {
+      flex: 1;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #555;
+      background: var(--card);
+      transition: all 0.15s;
+    }
+
+    .throw-slot.filled {
+      border-color: var(--red);
+      color: #eee;
+      background: var(--input-bg);
+    }
+
+    .throw-slot.miss {
+      border-color: #4a2a2a;
+      color: var(--red);
+      background: #1a0a0a;
+    }
+
+    /* Action buttons */
+    .action-row {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .btn-throw {
+      flex: 3;
+      background: var(--red);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 0.85rem 0.5rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .btn-throw:active { transform: scale(0.97); }
+    .btn-throw:disabled { background: #555; cursor: not-allowed; }
+
+    .btn-bounce {
+      flex: 1;
+      background: transparent;
+      color: #a0a0d0;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 0.85rem 0.3rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-bounce:active { transform: scale(0.97); }
+    .btn-bounce:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .btn-end-turn {
+      flex: 2;
+      background: transparent;
+      color: var(--red);
+      border: 2px solid var(--red);
+      border-radius: 10px;
+      padding: 0.85rem 0.5rem;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-end-turn:active { transform: scale(0.97); }
+    .btn-end-turn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--card);
+      color: #eee;
+      border-radius: 10px;
+      padding: 0.65rem 1.2rem;
+      font-size: 0.95rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      display: none;
+      z-index: 100;
+      max-width: 90vw;
+      text-align: center;
+      border: 1px solid var(--border);
+    }
+
+    /* Game over overlay */
+    #game-over-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.82);
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    .game-over-box {
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      padding: 2.5rem 2rem;
+      text-align: center;
+      max-width: 400px;
+    }
+
+    .game-over-box .icon { font-size: 3.5rem; }
+    .game-over-box h2 { font-size: 1.8rem; color: var(--red); margin: 0.5rem 0; }
+    .game-over-box p { color: #a0a0d0; margin-bottom: 1.5rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">🎯 DARTS</div>
+  <div id="current-turn-banner">Loading…</div>
+  <div id="darts-left-badge">— darts left</div>
+</header>
+
+<div id="main-layout">
+  <!-- Scoreboard on the left -->
+  <div id="scoreboard-panel">
+    <table class="scoreboard-table" id="scoreboard-table">
+      <thead><tr><th>—</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Controls on the right -->
+  <div id="controls-panel">
+    <div class="section-label">Select target</div>
+    <div class="target-grid" id="target-grid"></div>
+
+    <div class="section-label">Multiplier</div>
+    <div class="multiplier-row">
+      <button class="mul-btn selected" data-mul="1">Single</button>
+      <button class="mul-btn" data-mul="2">Double</button>
+      <button class="mul-btn" data-mul="3">Triple</button>
+    </div>
+
+    <div class="section-label">This turn</div>
+    <div class="throw-queue">
+      <div class="throw-slot" id="slot-0">—</div>
+      <div class="throw-slot" id="slot-1">—</div>
+      <div class="throw-slot" id="slot-2">—</div>
+    </div>
+
+    <div class="action-row">
+      <button class="btn-throw" id="btn-throw" disabled>Throw</button>
+      <button class="btn-bounce" id="btn-bounce" disabled aria-label="Undo last throw">↩ Bounce</button>
+      <button class="btn-end-turn" id="btn-end-turn" disabled>Next Player ▶</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Game over overlay -->
+<div id="game-over-overlay">
+  <div class="game-over-box">
+    <div class="icon">🏆</div>
+    <h2 id="game-over-title">Game Over!</h2>
+    <p id="game-over-msg"></p>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const gameId = location.pathname.split('/')[2];
+  const socket = io();
+
+  socket.emit('joinGame', { gameId });
+  socket.on('gameUpdate', applyState);
+
+  let gameState = null;
+  let selectedTarget = null;
+  let selectedMul = 1;
+  let pendingThrows = [];
+
+  fetch(`/api/games/${gameId}`)
+    .then(r => r.json())
+    .then(applyState)
+    .catch(() => showToast('Could not connect to game.'));
+
+  // ── State application ──────────────────────────────────────────────────────
+
+  function applyState(state) {
+    gameState = state;
+
+    if (state.gameOver) {
+      showGameOver(state);
+      return;
+    }
+
+    const current = state.players.find(p => p.id === state.currentPlayerId);
+    const dartsLeft = 3 - (state.dartsThrown || 0);
+
+    document.getElementById('current-turn-banner').innerHTML =
+      current ? `<span class="turn-name">${esc(current.name)}</span>'s turn` : 'Waiting…';
+    document.getElementById('darts-left-badge').textContent =
+      `${dartsLeft} dart${dartsLeft !== 1 ? 's' : ''} left`;
+
+    renderScoreboard(state);
+    renderTargetGrid(state);
+    updateSlots();
+    updateActionButtons();
+  }
+
+  // ── Scoreboard ─────────────────────────────────────────────────────────────
+
+  function renderScoreboard(state) {
+    const { players, targets, currentPlayerId } = state;
+    const table = document.getElementById('scoreboard-table');
+
+    let thead = '<tr><th class="target-col">Target</th>';
+    players.forEach(p => {
+      const isActive = p.id === currentPlayerId;
+      thead += `<th class="player-col${isActive ? ' active-turn' : ''}">${esc(p.name)}${isActive ? ' ▶' : ''}</th>`;
+    });
+    thead += '</tr>';
+
+    let tbody = '';
+    targets.forEach(t => {
+      tbody += `<tr><td class="target-col">${t === 25 ? 'BULL' : t}</td>`;
+      players.forEach(p => {
+        const marks = p.marks[t] || 0;
+        const closed = marks >= 3;
+        tbody += `<td class="marks-cell${closed ? ' closed' : ''}">${marksSymbol(marks)}</td>`;
+      });
+      tbody += '</tr>';
+    });
+
+    tbody += '<tr class="score-row"><td class="target-col">Score</td>';
+    players.forEach(p => {
+      tbody += `<td><span class="score-value">${p.score}</span></td>`;
+    });
+    tbody += '</tr>';
+
+    table.innerHTML = `<thead>${thead}</thead><tbody>${tbody}</tbody>`;
+  }
+
+  // ── Target grid ────────────────────────────────────────────────────────────
+
+  function renderTargetGrid(state) {
+    const current = state.players.find(p => p.id === state.currentPlayerId);
+    const grid = document.getElementById('target-grid');
+    grid.innerHTML = '';
+
+    state.targets.forEach(t => {
+      const marks = current ? (current.marks[t] || 0) : 0;
+      const closed = marks >= 3;
+
+      const btn = document.createElement('button');
+      btn.className = 'target-btn' +
+        (closed ? ' closed' : '') +
+        (selectedTarget === t ? ' selected' : '');
+      btn.dataset.target = t;
+      btn.innerHTML = `
+        <span>${t === 25 ? 'BULL' : t}</span>
+        <span class="marks-indicator">${marksSymbol(marks)}</span>
+      `;
+      btn.addEventListener('click', () => selectTarget(t));
+      grid.appendChild(btn);
+    });
+
+    const missBtn = document.createElement('button');
+    missBtn.className = 'target-btn miss-btn' + (selectedTarget === 0 ? ' selected' : '');
+    missBtn.dataset.target = '0';
+    missBtn.innerHTML = '<span>Miss</span><span class="marks-indicator">❌</span>';
+    missBtn.addEventListener('click', () => selectTarget(0));
+    grid.appendChild(missBtn);
+  }
+
+  function selectTarget(t) {
+    selectedTarget = t;
+    document.querySelectorAll('.target-btn').forEach(btn => {
+      const val = parseInt(btn.dataset.target, 10);
+      btn.classList.toggle('selected', val === t);
+    });
+    // Bull cannot be a triple
+    const tripleBtn = document.querySelector('.mul-btn[data-mul="3"]');
+    if (tripleBtn) {
+      tripleBtn.disabled = (t === 25);
+      if (t === 25 && selectedMul === 3) {
+        selectedMul = 1;
+        document.querySelectorAll('.mul-btn').forEach(b => b.classList.remove('selected'));
+        document.querySelector('.mul-btn[data-mul="1"]').classList.add('selected');
+      }
+    }
+    updateActionButtons();
+  }
+
+  // ── Multiplier ─────────────────────────────────────────────────────────────
+
+  document.querySelectorAll('.mul-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedMul = parseInt(btn.dataset.mul, 10);
+      document.querySelectorAll('.mul-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+  });
+
+  // ── Throw ──────────────────────────────────────────────────────────────────
+
+  document.getElementById('btn-throw').addEventListener('click', async () => {
+    if (selectedTarget === null || !gameState || gameState.gameOver) return;
+    if (pendingThrows.length >= 3) return;
+
+    const currentPlayerId = gameState.currentPlayerId;
+    const target = selectedTarget;
+    const multiplier = target === 0 ? 1 : selectedMul;
+
+    pendingThrows.push({ target, multiplier });
+    updateSlots();
+
+    selectedTarget = null;
+    selectedMul = 1;
+    document.querySelectorAll('.target-btn').forEach(b => b.classList.remove('selected'));
+    document.querySelectorAll('.mul-btn').forEach(b => {
+      b.classList.toggle('selected', b.dataset.mul === '1');
+      b.disabled = false;
+    });
+    document.getElementById('btn-throw').disabled = true;
+
+    try {
+      const res = await fetch(`/api/games/${gameId}/throw`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: currentPlayerId, target, multiplier }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Error recording throw.');
+        pendingThrows.pop();
+        updateSlots();
+        return;
+      }
+      applyState(data);
+    } catch {
+      showToast('Network error.');
+      pendingThrows.pop();
+      updateSlots();
+    }
+  });
+
+  // ── End turn ───────────────────────────────────────────────────────────────
+
+  document.getElementById('btn-end-turn').addEventListener('click', async () => {
+    if (!gameState || gameState.gameOver) return;
+
+    const currentPlayerId = gameState.currentPlayerId;
+    document.getElementById('btn-end-turn').disabled = true;
+
+    try {
+      const res = await fetch(`/api/games/${gameId}/end-turn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: currentPlayerId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Error ending turn.');
+        document.getElementById('btn-end-turn').disabled = false;
+        return;
+      }
+      pendingThrows = [];
+      updateSlots();
+      applyState(data);
+    } catch {
+      showToast('Network error.');
+      document.getElementById('btn-end-turn').disabled = false;
+    }
+  });
+
+  // ── Bounce ─────────────────────────────────────────────────────────────────
+
+  document.getElementById('btn-bounce').addEventListener('click', async () => {
+    if (!gameState || gameState.gameOver) return;
+    if (pendingThrows.length === 0) return;
+
+    const currentPlayerId = gameState.currentPlayerId;
+    document.getElementById('btn-bounce').disabled = true;
+
+    try {
+      const res = await fetch(`/api/games/${gameId}/bounce`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: currentPlayerId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Error reverting throw.');
+        document.getElementById('btn-bounce').disabled = pendingThrows.length === 0;
+        return;
+      }
+      pendingThrows.pop();
+      updateSlots();
+      applyState(data);
+    } catch {
+      showToast('Network error.');
+      document.getElementById('btn-bounce').disabled = pendingThrows.length === 0;
+    }
+  });
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  function updateSlots() {
+    for (let i = 0; i < 3; i++) {
+      const slot = document.getElementById(`slot-${i}`);
+      if (i < pendingThrows.length) {
+        const t = pendingThrows[i];
+        const isMiss = t.target === 0;
+        const label = t.target === 25 ? 'Bull' : (t.target === 0 ? 'Miss' : t.target);
+        const mul = t.multiplier === 3 ? 'T' : t.multiplier === 2 ? 'D' : 'S';
+        slot.textContent = isMiss ? '❌' : `${mul}${label}`;
+        slot.className = 'throw-slot filled' + (isMiss ? ' miss' : '');
+      } else {
+        slot.textContent = '—';
+        slot.className = 'throw-slot';
+      }
+    }
+  }
+
+  function updateActionButtons() {
+    const btnThrow = document.getElementById('btn-throw');
+    const btnBounce = document.getElementById('btn-bounce');
+    const btnEnd = document.getElementById('btn-end-turn');
+
+    if (!gameState || gameState.gameOver) {
+      btnThrow.disabled = true;
+      btnBounce.disabled = true;
+      btnEnd.disabled = true;
+      return;
+    }
+
+    btnThrow.disabled = selectedTarget === null || pendingThrows.length >= 3;
+    btnBounce.disabled = pendingThrows.length === 0;
+    btnEnd.disabled = false;
+  }
+
+  function showGameOver(state) {
+    const winner = state.players.find(p => p.id === state.winnerId);
+    document.getElementById('game-over-title').textContent =
+      winner ? `🏆 ${esc(winner.name)} Wins!` : '🏆 Game Over!';
+    document.getElementById('game-over-msg').textContent =
+      winner ? `Winner score: ${winner.score} points` : '';
+    document.getElementById('game-over-overlay').style.display = 'flex';
+  }
+
+  function marksSymbol(marks) {
+    if (marks === 0) return '';
+    if (marks === 1) return '/';
+    if (marks === 2) return 'X';
+    return '✓';
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 3000);
+  }
+
+  function esc(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+</script>
+</body>
+</html>
