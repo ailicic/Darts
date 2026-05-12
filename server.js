@@ -7,7 +7,7 @@ const fs = require('fs');
 const QRCode = require('qrcode');
 const rateLimit = require('express-rate-limit');
 
-const { createPlayer, processThrow, checkWinCondition, TARGETS } = require('./gameLogic');
+const { createPlayer, processThrow, checkWinCondition, TARGETS, isClosed } = require('./gameLogic');
 const {
   httpRequestDuration,
   httpRequestTotal,
@@ -97,6 +97,21 @@ let results = loadResults();
 // ── Helper: sanitize a player name ──────────────────────────────────────────
 function sanitizeName(name) {
   return String(name || '').trim().slice(0, 30).replace(/[<>"']/g, '');
+}
+
+// ── Helper: rank players at end of game ──────────────────────────────────────
+// Winner (rank 1) is the player who triggered the win condition.
+// Remaining players are ranked by: all targets closed first, then ascending darts score.
+function computePlacements(players, winnerId) {
+  const winner = players.find((p) => p.id === winnerId);
+  const others = players.filter((p) => p.id !== winnerId);
+  others.sort((a, b) => {
+    const aClosedAll = TARGETS.every((t) => isClosed(a, t));
+    const bClosedAll = TARGETS.every((t) => isClosed(b, t));
+    if (aClosedAll !== bClosedAll) return aClosedAll ? -1 : 1;
+    return a.score - b.score;
+  });
+  return [winner, ...others].map((p, i) => ({ name: p.name, rank: i + 1 }));
 }
 
 // ── REST API ──────────────────────────────────────────────────────────────────
@@ -218,10 +233,11 @@ app.post('/api/games/:gameId/throw', (req, res) => {
       if (wins.length > 1000) wins = wins.slice(-1000);
       saveWins(wins);
 
-      // Record all participants so win% can be computed
+      // Record all participants and placements so points can be computed
       results.push({
         players: game.players.map(p => p.name),
         winner: winner.name,
+        placements: computePlacements(game.players, winnerId),
         date: now,
       });
       if (results.length > 1000) results = results.slice(-1000);

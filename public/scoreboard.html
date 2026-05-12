@@ -72,14 +72,14 @@
       text-align: center;
     }
 
-    .summary-card .wins-count {
+    .summary-card .points-count {
       font-size: 2.5rem;
       font-weight: 800;
       color: #e94560;
       line-height: 1.1;
     }
 
-    .summary-card .win-pct {
+    .summary-card .games-played {
       font-size: 1rem;
       font-weight: 600;
       color: #a0a0d0;
@@ -94,11 +94,17 @@
       word-break: break-word;
     }
 
-    .summary-card .wins-label {
+    .summary-card .points-label {
       font-size: 0.75rem;
       color: #a0a0d0;
       text-transform: uppercase;
       letter-spacing: 1px;
+    }
+
+    .reset-note {
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 1.5rem;
     }
 
     /* History table */
@@ -162,11 +168,12 @@
 </header>
 
 <main>
-  <h2>All-Time Wins</h2>
+  <h2 id="month-heading">Points This Month</h2>
+  <div class="reset-note">Resets on the 1st of each month. 🥇 3 pts · 🥈 2 pts · 🥉 1 pt</div>
 
   <div id="summary-grid"></div>
 
-  <h3>Win History</h3>
+  <h3>Game History (This Month)</h3>
   <div id="history-container">
     <div id="loading-msg">Loading…</div>
   </div>
@@ -185,59 +192,90 @@
     });
   }
 
+  const RANK_POINTS = { 1: 3, 2: 2, 3: 1 };
+  const RANK_MEDAL  = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
+  // Update heading with current month name
+  const now = new Date();
+  const monthName = now.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+  document.getElementById('month-heading').textContent = `Points – ${monthName}`;
+
   fetch('/api/results')
     .then(r => r.json())
-    .then(results => {
+    .then(allResults => {
       const container = document.getElementById('history-container');
       const summaryGrid = document.getElementById('summary-grid');
 
+      // Filter to current month
+      const results = allResults.filter(r => {
+        const d = new Date(r.date);
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      });
+
       if (!results || results.length === 0) {
         summaryGrid.innerHTML = '';
-        container.innerHTML = '<div id="empty-msg">No games completed yet. Play some darts! 🎯</div>';
+        container.innerHTML = '<div id="empty-msg">No games completed this month. Play some darts! 🎯</div>';
         return;
       }
 
-      // Build per-player stats: wins + games played
+      // Build per-player points this month
       const stats = {};
       results.forEach(r => {
+        // Ensure all participants are tracked (even those with 0 pts)
         r.players.forEach(name => {
-          if (!stats[name]) stats[name] = { wins: 0, played: 0 };
+          if (!stats[name]) stats[name] = { points: 0, played: 0 };
           stats[name].played++;
         });
-        if (r.winner) {
-          if (!stats[r.winner]) stats[r.winner] = { wins: 0, played: 0 };
-          stats[r.winner].wins++;
+        if (r.placements) {
+          r.placements.forEach(({ name, rank }) => {
+            if (!stats[name]) stats[name] = { points: 0, played: 0 };
+            stats[name].points += (RANK_POINTS[rank] || 0);
+          });
+        } else if (r.winner) {
+          // Backward compat: old entries without placements – treat winner as 1st
+          if (!stats[r.winner]) stats[r.winner] = { points: 0, played: 0 };
+          stats[r.winner].points += 3;
         }
       });
 
-      // Sort by wins descending
-      const sorted = Object.entries(stats).sort((a, b) => b[1].wins - a[1].wins);
-      summaryGrid.innerHTML = sorted.map(([name, { wins, played }]) => {
-        const pct = played > 0 ? Math.round((wins / played) * 100) : 0;
-        return `
-          <div class="summary-card">
-            <div class="wins-count">${wins}</div>
-            <div class="wins-label">win${wins !== 1 ? 's' : ''}</div>
-            <div class="win-pct">${pct}% (${played} games)</div>
-            <div class="player-name">${esc(name)}</div>
-          </div>
-        `;
-      }).join('');
+      // Sort by points descending, then by name
+      const sorted = Object.entries(stats).sort((a, b) =>
+        b[1].points - a[1].points || a[0].localeCompare(b[0])
+      );
+      summaryGrid.innerHTML = sorted.map(([name, { points, played }]) => `
+        <div class="summary-card">
+          <div class="points-count">${points}</div>
+          <div class="points-label">point${points !== 1 ? 's' : ''}</div>
+          <div class="games-played">${played} game${played !== 1 ? 's' : ''}</div>
+          <div class="player-name">${esc(name)}</div>
+        </div>
+      `).join('');
 
       // History table – most recent first
-      const rows = [...results].reverse().map(r => `
-        <tr>
-          <td class="winner-name">🏆 ${esc(r.winner || '—')}</td>
-          <td>${esc(r.players.map(p => p).join(', '))}</td>
-          <td>${esc(formatDate(r.date))}</td>
-        </tr>
-      `).join('');
+      const rows = [...results].reverse().map(r => {
+        let placementText = '';
+        if (r.placements && r.placements.length > 0) {
+          placementText = r.placements
+            .filter(p => p.rank <= 3)
+            .map(p => `${RANK_MEDAL[p.rank] || p.rank + '.'} ${esc(p.name)}`)
+            .join('  ');
+        } else {
+          placementText = `🥇 ${esc(r.winner || '—')}`;
+        }
+        return `
+          <tr>
+            <td class="winner-name">${placementText}</td>
+            <td>${esc(r.players.join(', '))}</td>
+            <td>${esc(formatDate(r.date))}</td>
+          </tr>
+        `;
+      }).join('');
 
       container.innerHTML = `
         <table>
           <thead>
             <tr>
-              <th>Winner</th>
+              <th>Placements</th>
               <th>Players</th>
               <th>Date</th>
             </tr>
