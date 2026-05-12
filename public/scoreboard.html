@@ -72,14 +72,14 @@
       text-align: center;
     }
 
-    .summary-card .wins-count {
+    .summary-card .points-count {
       font-size: 2.5rem;
       font-weight: 800;
       color: #e94560;
       line-height: 1.1;
     }
 
-    .summary-card .win-pct {
+    .summary-card .games-played {
       font-size: 1rem;
       font-weight: 600;
       color: #a0a0d0;
@@ -94,7 +94,7 @@
       word-break: break-word;
     }
 
-    .summary-card .wins-label {
+    .summary-card .points-label {
       font-size: 0.75rem;
       color: #a0a0d0;
       text-transform: uppercase;
@@ -244,9 +244,9 @@
       );
       summaryGrid.innerHTML = sorted.map(([name, { points, played }]) => `
         <div class="summary-card">
-          <div class="wins-count">${points}</div>
-          <div class="wins-label">point${points !== 1 ? 's' : ''}</div>
-          <div class="win-pct">${played} game${played !== 1 ? 's' : ''}</div>
+          <div class="points-count">${points}</div>
+          <div class="points-label">point${points !== 1 ? 's' : ''}</div>
+          <div class="games-played">${played} game${played !== 1 ? 's' : ''}</div>
           <div class="player-name">${esc(name)}</div>
         </div>
       `).join('');
