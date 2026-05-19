@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const fs = require('fs');
 const QRCode = require('qrcode');
 const rateLimit = require('express-rate-limit');
 
@@ -17,7 +18,6 @@ const {
   socketConnections,
   register,
 } = require('./metrics');
-const { initDb, loadWins, saveWin, loadResults, saveResult } = require('./db');
 
 const app = express();
 const server = http.createServer(app);
@@ -26,6 +26,49 @@ const io = new Server(server);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ── Persistent storage ────────────────────────────────────────────────────────
+const DATA_DIR = process.env.DATA_DIR || '/data';
+const WINS_FILE = path.join(DATA_DIR, 'wins.json');
+const RESULTS_FILE = path.join(DATA_DIR, 'results.json');
+
+function loadWins() {
+  try {
+    const raw = fs.readFileSync(WINS_FILE, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function saveWins(winsData) {
+  const tmp = WINS_FILE + '.tmp';
+  fs.promises.mkdir(DATA_DIR, { recursive: true })
+    .then(() => fs.promises.writeFile(tmp, JSON.stringify(winsData), 'utf8'))
+    .then(() => fs.promises.rename(tmp, WINS_FILE))
+    .catch((err) => console.error('Failed to persist wins:', err));
+}
+
+/**
+ * results = [{ players: string[], winner: string, date: string }]
+ * Tracks all participants of every completed game so we can compute win%.
+ */
+function loadResults() {
+  try {
+    const raw = fs.readFileSync(RESULTS_FILE, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function saveResults(resultsData) {
+  const tmp = RESULTS_FILE + '.tmp';
+  fs.promises.mkdir(DATA_DIR, { recursive: true })
+    .then(() => fs.promises.writeFile(tmp, JSON.stringify(resultsData), 'utf8'))
+    .then(() => fs.promises.rename(tmp, RESULTS_FILE))
+    .catch((err) => console.error('Failed to persist results:', err));
+}
 
 // ── Prometheus metrics middleware ──────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -40,11 +83,16 @@ app.use((req, res, next) => {
 });
 
 // ── In-memory game store ──────────────────────────────────────────────────────
+// games[gameId] = { id, players[], currentPlayerIndex, turns[], gameOver, winnerId, createdAt }
 const games = {};
 
-// ── In-memory caches (loaded from DB on startup) ─────────────────────────────
-let wins = [];
-let results = [];
+// ── Wins history (loaded from disk on startup) ────────────────────────────────
+// wins = [{ playerName, date }]
+let wins = loadWins();
+
+// ── Game results (loaded from disk on startup) ────────────────────────────────
+// results = [{ players: string[], winner: string, date: string }]
+let results = loadResults();
 
 // ── Helper: sanitize a player name ──────────────────────────────────────────
 function sanitizeName(name) {
@@ -52,6 +100,8 @@ function sanitizeName(name) {
 }
 
 // ── Helper: rank players at end of game ──────────────────────────────────────
+// Winner (rank 1) is the player who triggered the win condition.
+// Remaining players are ranked by: all targets closed first, then ascending darts score.
 function computePlacements(players, winnerId) {
   const winner = players.find((p) => p.id === winnerId);
   const others = players.filter((p) => p.id !== winnerId);
@@ -66,6 +116,11 @@ function computePlacements(players, winnerId) {
 
 // ── REST API ──────────────────────────────────────────────────────────────────
 
+/**
+ * POST /api/games
+ * Body: { playerNames: string[] }
+ * Creates a new game and returns { gameId, players }
+ */
 app.post('/api/games', (req, res) => {
   const { playerNames } = req.body;
 
@@ -88,10 +143,10 @@ app.post('/api/games', (req, res) => {
     id: gameId,
     players,
     currentPlayerIndex: 0,
-    dartsThrown: 0,
-    turnHistory: [],
-    currentTurnThrows: [],
-    claimedPlayerIds: new Set(),
+    dartsThrown: 0,           // darts thrown this turn (0-3)
+    turnHistory: [],           // [{ playerId, throws: [{target, multiplier, result}] }]
+    currentTurnThrows: [],     // throws within the current turn
+    claimedPlayerIds: new Set(), // player IDs that have been claimed by a device
     gameOver: false,
     winnerId: null,
     createdAt: Date.now(),
@@ -106,13 +161,24 @@ app.post('/api/games', (req, res) => {
   });
 });
 
+/**
+ * GET /api/games/:gameId
+ * Returns full game state.
+ */
 app.get('/api/games/:gameId', (req, res) => {
   const game = games[req.params.gameId];
   if (!game) return res.status(404).json({ error: 'Game not found.' });
   return res.json(gameState(game));
 });
 
-app.post('/api/games/:gameId/throw', async (req, res) => {
+/**
+ * POST /api/games/:gameId/throw
+ * Body: { playerId, target, multiplier }
+ *   target: 15|16|17|18|19|20|25|0 (0 = miss)
+ *   multiplier: 1|2|3
+ * Records a dart throw and advances turn after 3 darts.
+ */
+app.post('/api/games/:gameId/throw', (req, res) => {
   const game = games[req.params.gameId];
   if (!game) return res.status(404).json({ error: 'Game not found.' });
   if (game.gameOver) return res.status(409).json({ error: 'Game is already over.' });
@@ -141,6 +207,7 @@ app.post('/api/games/:gameId/throw', async (req, res) => {
     return res.status(409).json({ error: 'Turn already complete, call end-turn first.' });
   }
 
+  // Snapshot player states before the throw so it can be undone via bounce
   const snapshot = game.players.map((p) => ({
     id: p.id,
     marks: { ...p.marks },
@@ -153,41 +220,44 @@ app.post('/api/games/:gameId/throw', async (req, res) => {
 
   dartsThrown.inc();
 
-  const winCheck = checkWinCondition(game.players);
+  const { gameOver, winnerId } = checkWinCondition(game.players);
 
-  if (winCheck.gameOver) {
+  if (gameOver) {
     game.gameOver = true;
-    game.winnerId = winCheck.winnerId;
-    const winner = game.players.find((p) => p.id === winCheck.winnerId);
+    game.winnerId = winnerId;
+    const winner = game.players.find(p => p.id === winnerId);
     if (winner) {
       const now = new Date().toISOString();
-      const placements = computePlacements(game.players, winCheck.winnerId);
-
-      // Only award placement points for 3+ player games
-      const finalPlacements = game.players.length >= 3 ? placements : null;
-
-      // Save to DB
-      await saveWin(winner.name, now);
-      await saveResult(game.players.map((p) => p.name), winner.name, finalPlacements, now);
-
-      // Update in-memory cache
       wins.push({ playerName: winner.name, date: now });
+      // Keep the wins log from growing indefinitely
+      if (wins.length > 1000) wins = wins.slice(-1000);
+      saveWins(wins);
+
+      // Record all participants and placements so points can be computed
       results.push({
-        players: game.players.map((p) => p.name),
+        players: game.players.map(p => p.name),
         winner: winner.name,
-        placements: finalPlacements,
+        placements: computePlacements(game.players, winnerId),
         date: now,
       });
-
+      if (results.length > 1000) results = results.slice(-1000);
+      saveResults(results);
       gameWinsTotal.labels(winner.name).inc();
     }
     activeGames.set(Math.max(0, Object.keys(games).length - 1));
   }
 
+  // Emit real-time update to all clients watching this game
   io.to(game.id).emit('gameUpdate', gameState(game));
+
   return res.json(gameState(game));
 });
 
+/**
+ * POST /api/games/:gameId/end-turn
+ * Body: { playerId }
+ * Ends the current player's turn (even if fewer than 3 darts thrown).
+ */
 app.post('/api/games/:gameId/end-turn', (req, res) => {
   const game = games[req.params.gameId];
   if (!game) return res.status(404).json({ error: 'Game not found.' });
@@ -200,20 +270,29 @@ app.post('/api/games/:gameId/end-turn', (req, res) => {
     return res.status(403).json({ error: 'It is not your turn.' });
   }
 
+  // Save turn to history
   game.turnHistory.push({
     playerId: currentPlayer.id,
     playerName: currentPlayer.name,
     throws: [...game.currentTurnThrows],
   });
 
+  // Advance to next player
   game.currentPlayerIndex = (game.currentPlayerIndex + 1) % game.players.length;
   game.dartsThrown = 0;
   game.currentTurnThrows = [];
 
   io.to(game.id).emit('gameUpdate', gameState(game));
+
   return res.json(gameState(game));
 });
 
+/**
+ * POST /api/games/:gameId/bounce
+ * Body: { playerId }
+ * Reverts the last dart throw in the current turn.
+ * Can only undo throws made within the current (not-yet-ended) turn.
+ */
 app.post('/api/games/:gameId/bounce', (req, res) => {
   const game = games[req.params.gameId];
   if (!game) return res.status(404).json({ error: 'Game not found.' });
@@ -230,6 +309,7 @@ app.post('/api/games/:gameId/bounce', (req, res) => {
     return res.status(409).json({ error: 'No throws to revert in the current turn.' });
   }
 
+  // Pop the last throw and restore the player snapshot from before that throw
   const lastThrow = game.currentTurnThrows.pop();
   lastThrow.snapshot.forEach((saved, idx) => {
     game.players[idx].marks = { ...saved.marks };
@@ -241,63 +321,35 @@ app.post('/api/games/:gameId/bounce', (req, res) => {
   return res.json(gameState(game));
 });
 
-app.post('/api/games/:gameId/undo-turn', (req, res) => {
-  const game = games[req.params.gameId];
-  if (!game) return res.status(404).json({ error: 'Game not found.' });
-  if (game.gameOver) return res.status(409).json({ error: 'Game is already over.' });
-
-  if (game.turnHistory.length === 0) {
-    return res.status(409).json({ error: 'No previous turn to undo.' });
-  }
-
-  // Only allow undo if current player has not thrown yet
-  if (game.currentTurnThrows.length > 0) {
-    return res.status(409).json({ error: 'Current player has already thrown. Use bounce first.' });
-  }
-
-  // Pop the last completed turn
-  const lastTurn = game.turnHistory.pop();
-
-  // Restore player states from the snapshot of the first throw of that turn
-  if (lastTurn.throws.length > 0 && lastTurn.throws[0].snapshot) {
-    lastTurn.throws[0].snapshot.forEach((saved, idx) => {
-      game.players[idx].marks = { ...saved.marks };
-      game.players[idx].score = saved.score;
-    });
-  }
-
-  // Move back to the previous player
-  const prevIndex = game.players.findIndex((p) => p.id === lastTurn.playerId);
-  if (prevIndex !== -1) {
-    game.currentPlayerIndex = prevIndex;
-  } else {
-    game.currentPlayerIndex = (game.currentPlayerIndex - 1 + game.players.length) % game.players.length;
-  }
-
-  game.dartsThrown = 0;
-  game.currentTurnThrows = [];
-
-  io.to(game.id).emit('gameUpdate', gameState(game));
-  return res.json(gameState(game));
-});
-
+/**
+ * POST /api/games/:gameId/claim/:playerId
+ * Atomically claims a player slot for a device.
+ * Returns 409 if that player has already been claimed by another device.
+ */
 app.post('/api/games/:gameId/claim/:playerId', (req, res) => {
   const game = games[req.params.gameId];
   if (!game) return res.status(404).json({ error: 'Game not found.' });
 
   const { playerId } = req.params;
-  const player = game.players.find((p) => p.id === playerId);
+  const player = game.players.find(p => p.id === playerId);
   if (!player) return res.status(404).json({ error: 'Player not found.' });
 
   if (game.claimedPlayerIds.has(playerId)) {
     return res.status(409).json({ error: 'This player has already been taken by another device.' });
   }
 
+  // Node.js is single-threaded: has() + add() is effectively atomic for in-memory state.
   game.claimedPlayerIds.add(playerId);
+  // Broadcast updated state so the join page reflects the new claim
   io.to(game.id).emit('gameUpdate', gameState(game));
   return res.json({ ok: true });
 });
 
+/**
+ * POST /api/games/:gameId/reset
+ * Creates a fresh game with the same player names and returns { gameId, players }.
+ * The original game is left intact so existing display/mobile links don't crash.
+ */
 app.post('/api/games/:gameId/reset', (req, res) => {
   const game = games[req.params.gameId];
   if (!game) return res.status(404).json({ error: 'Game not found.' });
@@ -325,17 +377,26 @@ app.post('/api/games/:gameId/reset', (req, res) => {
   });
 });
 
+/**
+ * GET /api/wins
+ * Returns the all-time wins history: [{ playerName, date }]
+ */
 app.get('/api/wins', (req, res) => {
   res.json(wins);
 });
 
+/**
+ * GET /api/results
+ * Returns all game results: [{ players: string[], winner: string, date: string }]
+ * Used to compute win% and frequent players.
+ */
 app.get('/api/results', (req, res) => {
   res.json(results);
 });
 
 const pageRateLimit = rateLimit({
-  windowMs: 60 * 1000,
-  max: 120,
+  windowMs: 60 * 1000, // 1 minute
+  max: 120,            // up to 120 page loads per minute per IP
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -364,13 +425,18 @@ app.get('/shared/:gameId', pageRateLimit, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'shared.html'));
 });
 
+/**
+ * GET /api/games/:gameId/shared-qr
+ * Returns an SVG QR code whose content is the shared tablet URL for this game.
+ * The shared URL points to /shared/:gameId so any device can score for all players.
+ */
 app.get('/api/games/:gameId/shared-qr', async (req, res) => {
   const game = games[req.params.gameId];
   if (!game) return res.status(404).json({ error: 'Game not found.' });
 
   const proto = req.headers['x-forwarded-proto'] || req.protocol;
   const host = req.headers['x-forwarded-host'] || req.get('host');
-  const sharedUrl = proto + '://' + host + '/shared/' + req.params.gameId;
+  const sharedUrl = `${proto}://${host}/shared/${req.params.gameId}`;
 
   try {
     const svg = await QRCode.toString(sharedUrl, { type: 'svg', margin: 2, width: 250 });
@@ -381,13 +447,18 @@ app.get('/api/games/:gameId/shared-qr', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/games/:gameId/join-qr
+ * Returns an SVG QR code whose content is the join URL for this game.
+ * The join URL points to /join/:gameId so any player can pick their seat.
+ */
 app.get('/api/games/:gameId/join-qr', async (req, res) => {
   const game = games[req.params.gameId];
   if (!game) return res.status(404).json({ error: 'Game not found.' });
 
   const proto = req.headers['x-forwarded-proto'] || req.protocol;
   const host = req.headers['x-forwarded-host'] || req.get('host');
-  const joinUrl = proto + '://' + host + '/join/' + req.params.gameId;
+  const joinUrl = `${proto}://${host}/join/${req.params.gameId}`;
 
   try {
     const svg = await QRCode.toString(joinUrl, { type: 'svg', margin: 2, width: 250 });
@@ -398,6 +469,7 @@ app.get('/api/games/:gameId/join-qr', async (req, res) => {
   }
 });
 
+// ── Metrics endpoint ──────────────────────────────────────────────────────────
 app.get('/metrics', async (req, res) => {
   res.set('Content-Type', register.contentType);
   res.end(await register.metrics());
@@ -441,21 +513,8 @@ function gameState(game) {
 // ── Start server ──────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 3000;
-
-async function start() {
-  await initDb();
-  wins = await loadWins();
-  results = await loadResults();
-  console.log('Loaded ' + wins.length + ' wins and ' + results.length + ' results from database');
-
-  server.listen(PORT, () => {
-    console.log('Darts server running on http://localhost:' + PORT);
-  });
-}
-
-start().catch((err) => {
-  console.error('Failed to start:', err);
-  process.exit(1);
+server.listen(PORT, () => {
+  console.log(`Darts server running on http://localhost:${PORT}`);
 });
 
-module.exports = { app, server, games };
+module.exports = { app, server, games, wins, results };

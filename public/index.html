@@ -333,6 +333,12 @@
       text-align: center;
       padding: 1rem 0;
     }
+
+    .sb-subtitle {
+      font-size: 0.75rem;
+      color: #7878aa;
+      margin-bottom: 0.6rem;
+    }
   </style>
 </head>
 <body>
@@ -342,14 +348,22 @@
   </div>
 
   <div class="main-container">
-    <!-- Left: Today's Scoreboard -->
+    <!-- Left: Today's Scoreboard + 1v1 Today -->
     <div class="scoreboard-column">
       <div class="scoreboard">
         <h3>
-          🏆 Today
+          🏆 Today (3+ players)
           <span class="sb-date" id="sb-today-date"></span>
         </h3>
+        <div class="sb-subtitle">🥇 3 pts · 🥈 2 pts · 🥉 1 pt</div>
         <div id="sb-today-body"><div class="sb-empty">Loading…</div></div>
+      </div>
+      <div class="scoreboard" style="margin-top:1rem;">
+        <h3>
+          ⚔️ Today (1v1)
+          <span class="sb-date" id="sb-today-1v1-date"></span>
+        </h3>
+        <div id="sb-today-1v1-body"><div class="sb-empty">Loading…</div></div>
       </div>
     </div>
 
@@ -382,13 +396,19 @@
       </div>
     </div>
 
-    <!-- Right: All-Time Scoreboard -->
+    <!-- Right: All-Time Scoreboard + 1v1 All-Time -->
     <div class="scoreboard-column">
       <div class="scoreboard">
         <h3>
-          ⭐ All-Time
+          ⭐ All-Time (3+ players)
         </h3>
         <div id="sb-alltime-body"><div class="sb-empty">Loading…</div></div>
+      </div>
+      <div class="scoreboard" style="margin-top:1rem;">
+        <h3>
+          ⚔️ All-Time (1v1)
+        </h3>
+        <div id="sb-alltime-1v1-body"><div class="sb-empty">Loading…</div></div>
       </div>
     </div>
   </div>
@@ -457,15 +477,23 @@
         return;
       }
 
-      // Count games played and wins per player
+      // Count overall stats: only 3+ player games
+      const RANK_PTS = { 1: 3, 2: 2, 3: 1 };
       const stats = {};
-      results.forEach(r => {
+      results.filter(r => r.players.length >= 3).forEach(r => {
         r.players.forEach(name => {
-          if (!stats[name]) stats[name] = { played: 0, wins: 0 };
+          if (!stats[name]) stats[name] = { played: 0, points: 0, wins: 0 };
           stats[name].played++;
         });
-        if (r.winner) {
-          if (!stats[r.winner]) stats[r.winner] = { played: 0, wins: 0 };
+        if (r.placements) {
+          // 3+ player game: award placement points
+          r.placements.forEach(({ name, rank }) => {
+            if (!stats[name]) stats[name] = { played: 0, points: 0, wins: 0 };
+            stats[name].points += (RANK_PTS[rank] || 0);
+          });
+        } else if (r.winner) {
+          // 1v1 game: count as a win
+          if (!stats[r.winner]) stats[r.winner] = { played: 0, points: 0, wins: 0 };
           stats[r.winner].wins++;
         }
       });
@@ -480,13 +508,15 @@
         return;
       }
 
-      container.innerHTML = top6.map(([name, { played, wins }]) => {
-        const pct = played > 0 ? Math.round((wins / played) * 100) : 0;
+      container.innerHTML = top6.map(([name, { played, points }]) => {
+        const parts = [];
+        if (points > 0) parts.push(points + 'pts');
+        parts.push(played + 'G');
         return `
           <label class="frequent-row">
             <input type="checkbox" class="frequent-cb" value="${escapeAttr(name)}" />
             <span class="freq-name">${escapeHtml(name)}</span>
-            <span class="freq-stats">${wins}W / ${played}G &nbsp; ${pct}%</span>
+            <span class="freq-stats">${parts.join(' / ')}</span>
           </label>
         `;
       }).join('');
@@ -618,19 +648,55 @@
     }
 
     function renderScoreboards(results) {
-      const sbTodayBody = document.getElementById('sb-today-body');
-      const sbAlltimeBody = document.getElementById('sb-alltime-body');
       const sbTodayDate = document.getElementById('sb-today-date');
+      const sbToday1v1Date = document.getElementById('sb-today-1v1-date');
+      const dateStr = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      sbTodayDate.textContent = dateStr;
+      sbToday1v1Date.textContent = dateStr;
 
-      sbTodayDate.textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-
-      // Filter today's results
       const todayResults = results.filter(r => isSameDay(r.date));
 
-      function buildScoreboard(resultsList) {
-        if (resultsList.length === 0) {
-          return '<div class="sb-empty">No games yet</div>';
-        }
+      // Split by game size
+      const multi = results.filter(r => r.players.length >= 3);
+      const multiToday = todayResults.filter(r => r.players.length >= 3);
+      const duel = results.filter(r => r.players.length === 2);
+      const duelToday = todayResults.filter(r => r.players.length === 2);
+
+      const RANK_PTS = { 1: 3, 2: 2, 3: 1 };
+
+      // 3+ player scoreboard (points)
+      function buildPointsBoard(resultsList) {
+        if (resultsList.length === 0) return '<div class="sb-empty">No games yet</div>';
+
+        const stats = {};
+        resultsList.forEach(r => {
+          r.players.forEach(name => {
+            if (!stats[name]) stats[name] = { points: 0, played: 0 };
+            stats[name].played++;
+          });
+          if (r.placements) {
+            r.placements.forEach(({ name, rank }) => {
+              if (!stats[name]) stats[name] = { points: 0, played: 0 };
+              stats[name].points += (RANK_PTS[rank] || 0);
+            });
+          }
+        });
+
+        const sorted = Object.entries(stats).sort((a, b) => b[1].points - a[1].points);
+        return sorted.map(([name, { points, played }], i) => `
+          <div class="sb-row">
+            <span class="sb-rank">${rankEmoji(i)}</span>
+            <span class="sb-name">${escapeHtml(name)}</span>
+            <span class="sb-wins">${points}</span>
+            <span class="sb-wins-label">pts</span>
+            <span class="sb-pct">${played}G</span>
+          </div>
+        `).join('');
+      }
+
+      // 1v1 scoreboard (wins)
+      function buildWinsBoard(resultsList) {
+        if (resultsList.length === 0) return '<div class="sb-empty">No games yet</div>';
 
         const stats = {};
         resultsList.forEach(r => {
@@ -645,7 +711,6 @@
         });
 
         const sorted = Object.entries(stats).sort((a, b) => b[1].wins - a[1].wins);
-
         return sorted.map(([name, { wins, played }], i) => {
           const pct = played > 0 ? Math.round((wins / played) * 100) : 0;
           return `
@@ -660,8 +725,10 @@
         }).join('');
       }
 
-      sbTodayBody.innerHTML = buildScoreboard(todayResults);
-      sbAlltimeBody.innerHTML = buildScoreboard(results);
+      document.getElementById('sb-today-body').innerHTML = buildPointsBoard(multiToday);
+      document.getElementById('sb-alltime-body').innerHTML = buildPointsBoard(multi);
+      document.getElementById('sb-today-1v1-body').innerHTML = buildWinsBoard(duelToday);
+      document.getElementById('sb-alltime-1v1-body').innerHTML = buildWinsBoard(duel);
     }
 
     function loadScorecards() {
