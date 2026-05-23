@@ -465,7 +465,6 @@
   const socket = io();
 
   socket.emit('joinGame', { gameId });
-  socket.on('rematch', ({ newGameId }) => { location.href = `/shared/${newGameId}`; });
   socket.on('gameUpdate', applyState);
 
   let gameState = null;

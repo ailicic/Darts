@@ -528,7 +528,6 @@
   const socket = io();
 
   socket.emit('joinGame', { gameId });
-  socket.on('rematch', ({ newGameId }) => { location.href = `/display/${newGameId}`; });
 
   socket.on('gameUpdate', (state) => {
     renderGame(state);

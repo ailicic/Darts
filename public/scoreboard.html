@@ -223,18 +223,20 @@
       results.forEach(r => {
         // Ensure all participants are tracked (even those with 0 pts)
         r.players.forEach(name => {
-          if (!stats[name]) stats[name] = { points: 0, played: 0 };
+          if (!stats[name]) stats[name] = { points: 0, played: 0, wins: 0 };
           stats[name].played++;
         });
         if (r.placements) {
           r.placements.forEach(({ name, rank }) => {
-            if (!stats[name]) stats[name] = { points: 0, played: 0 };
+            if (!stats[name]) stats[name] = { points: 0, played: 0, wins: 0 };
             stats[name].points += (RANK_POINTS[rank] || 0);
+            if (rank === 1) stats[name].wins++;
           });
         } else if (r.winner) {
           // Backward compat: old entries without placements – treat winner as 1st
-          if (!stats[r.winner]) stats[r.winner] = { points: 0, played: 0 };
+          if (!stats[r.winner]) stats[r.winner] = { points: 0, played: 0, wins: 0 };
           stats[r.winner].points += 3;
+          stats[r.winner].wins++;
         }
       });
 
@@ -242,14 +244,17 @@
       const sorted = Object.entries(stats).sort((a, b) =>
         b[1].points - a[1].points || a[0].localeCompare(b[0])
       );
-      summaryGrid.innerHTML = sorted.map(([name, { points, played }]) => `
+      summaryGrid.innerHTML = sorted.map(([name, { points, played, wins }]) => {
+        const winPct = played > 0 ? Math.round((wins / played) * 100) : 0;
+        return `
         <div class="summary-card">
           <div class="points-count">${points}</div>
           <div class="points-label">point${points !== 1 ? 's' : ''}</div>
-          <div class="games-played">${played} game${played !== 1 ? 's' : ''}</div>
+          <div class="games-played">${winPct}% won (${played} game${played !== 1 ? 's' : ''})</div>
           <div class="player-name">${esc(name)}</div>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       // History table – most recent first
       const rows = [...results].reverse().map(r => {

@@ -55,12 +55,7 @@ function sanitizeName(name) {
 function computePlacements(players, winnerId) {
   const winner = players.find((p) => p.id === winnerId);
   const others = players.filter((p) => p.id !== winnerId);
-  others.sort((a, b) => {
-    const aClosedAll = TARGETS.every((t) => isClosed(a, t));
-    const bClosedAll = TARGETS.every((t) => isClosed(b, t));
-    if (aClosedAll !== bClosedAll) return aClosedAll ? -1 : 1;
-    return a.score - b.score;
-  });
+  others.sort((a, b) => a.score - b.score);
   return [winner, ...others].map((p, i) => ({ name: p.name, rank: i + 1 }));
 }
 
