@@ -21,22 +21,10 @@ services:
     environment:
       - PORT=3000
       - DATABASE_URL=postgresql://darts:darts123@postgres:5432/darts
-<<<<<<< HEAD
     depends_on:
       - postgres
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:16-alpine
-    container_name: darts-postgres
-    environment:
-      - POSTGRES_USER=darts
-      - POSTGRES_PASSWORD=darts123
-      - POSTGRES_DB=darts
-=======
->>>>>>> origin/main
     volumes:
-      - darts-db:/var/lib/postgresql/data
+      - darts-data:/data
     restart: unless-stopped
 
   node_exporter:
@@ -91,10 +79,6 @@ services:
 
 volumes:
   darts-data:
-<<<<<<< HEAD
-  darts-db:
-=======
   postgres-data:
->>>>>>> origin/main
   prometheus-data:
   grafana-data:
