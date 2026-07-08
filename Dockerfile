@@ -9,7 +9,7 @@ WORKDIR /app
 # Before running docker build, prune dev dependencies from the host:
 #   npm install --omit=dev
 COPY --chown=darts:darts node_modules ./node_modules
-COPY --chown=darts:darts gameLogic.js server.js db.js metrics.js ./
+COPY --chown=darts:darts gameLogic.js server.js db.js metrics.js versions.txt ./
 COPY --chown=darts:darts public ./public
 
 USER darts

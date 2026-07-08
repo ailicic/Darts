@@ -454,6 +454,19 @@
       font-size: 0.8rem;
       color: #666;
     }
+
+    /* ── Version badge ──────────────────────────────────────────────────────── */
+    #version-badge {
+      position: fixed;
+      bottom: 8px;
+      right: 12px;
+      font-size: 0.75rem;
+      color: #555;
+      font-family: 'Courier New', monospace;
+      opacity: 0.7;
+      pointer-events: none;
+      z-index: 50;
+    }
   </style>
 </head>
 <body>
@@ -462,6 +475,9 @@
   <div class="header-title">🎯 DARTS – CUT THROAT</div>
   <div id="turn-indicator">Loading…</div>
 </header>
+
+<!-- App version (matches the running Docker image tag) -->
+<div id="version-badge"></div>
 
 <div id="game-over-banner"></div>
 
@@ -529,6 +545,14 @@
 
   socket.emit('joinGame', { gameId });
   socket.on('rematch', ({ newGameId }) => { location.href = `/display/${newGameId}`; });
+
+  // Show the running app version (Docker image tag) in the bottom-right corner.
+  fetch('/api/version')
+    .then(r => r.json())
+    .then(({ version }) => {
+      if (version) document.getElementById('version-badge').textContent = 'v' + version;
+    })
+    .catch(() => {});
 
   socket.on('gameUpdate', (state) => {
     renderGame(state);

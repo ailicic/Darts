@@ -538,6 +538,10 @@
   const socket = io();
   socket.emit('joinGame', { gameId });
 
+  // Follow a rematch triggered from any device (laptop/display, tablet, phone).
+  // Mobile players go back to the join page so they can re-claim their slot.
+  socket.on('rematch', ({ newGameId }) => { location.href = `/join/${newGameId}`; });
+
   let gameState = null;
   let selectedTarget = null;
   let selectedMul = 1;
