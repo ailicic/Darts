@@ -3,8 +3,21 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const fs = require('fs');
 const QRCode = require('qrcode');
 const rateLimit = require('express-rate-limit');
+
+// ── App version (matches the Docker image tag from versions.txt) ─────────────
+// Allow an explicit override via APP_VERSION, otherwise fall back to the
+// versions.txt file that drives the image tag, then to 'dev'.
+const APP_VERSION = (() => {
+  if (process.env.APP_VERSION) return process.env.APP_VERSION.trim();
+  try {
+    return fs.readFileSync(path.join(__dirname, 'versions.txt'), 'utf8').trim();
+  } catch {
+    return 'dev';
+  }
+})();
 
 const { createPlayer, processThrow, checkWinCondition, TARGETS, isClosed } = require('./gameLogic');
 const {
@@ -314,10 +327,19 @@ app.post('/api/games/:gameId/reset', (req, res) => {
     createdAt: Date.now(),
   };
 
+  // Notify every client still connected to the old game (display, mobiles,
+  // shared) so they all follow the rematch to the new game instead of only
+  // the device that triggered the reset.
+  io.to(game.id).emit('rematch', { newGameId });
+
   return res.status(201).json({
     gameId: newGameId,
     players: players.map(({ id, name }) => ({ id, name })),
   });
+});
+
+app.get('/api/version', (req, res) => {
+  res.json({ version: APP_VERSION });
 });
 
 app.get('/api/wins', (req, res) => {
