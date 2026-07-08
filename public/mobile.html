@@ -490,6 +490,7 @@
   <div class="action-row">
     <button class="btn-throw" id="btn-throw" disabled>Throw</button>
     <button class="btn-bounce" id="btn-bounce" disabled aria-label="Undo last throw">↩ Bounce</button>
+    <button class="btn-bounce" id="btn-undo-turn" disabled aria-label="Undo previous turn">↩ Prev</button>
     <button class="btn-end-turn" id="btn-end-turn" disabled>End Turn</button>
   </div>
 </div>
@@ -851,6 +852,38 @@
     }
   });
 
+  // ── Undo previous turn ─────────────────────────────────────────────────
+
+  document.getElementById('btn-undo-turn').addEventListener('click', async () => {
+    if (!gameState || gameState.gameOver) return;
+    if (pendingThrows.length > 0) {
+      showToast('Use Bounce first to undo current throws.');
+      return;
+    }
+
+    document.getElementById('btn-undo-turn').disabled = true;
+
+    try {
+      const res = await fetch(`/api/games/${gameId}/undo-turn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Cannot undo turn.');
+        document.getElementById('btn-undo-turn').disabled = false;
+        return;
+      }
+      pendingThrows = [];
+      updateSlots();
+      applyState(data);
+    } catch {
+      showToast('Network error.');
+      document.getElementById('btn-undo-turn').disabled = false;
+    }
+  });
+
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   function updateSlots() {
@@ -873,20 +906,20 @@
   function updateActionButtons(isMyTurn) {
     const btnThrow = document.getElementById('btn-throw');
     const btnBounce = document.getElementById('btn-bounce');
+    const btnUndoTurn = document.getElementById('btn-undo-turn');
     const btnEnd = document.getElementById('btn-end-turn');
 
     if (!isMyTurn) {
       btnThrow.disabled = true;
       btnBounce.disabled = true;
+      btnUndoTurn.disabled = true;
       btnEnd.disabled = true;
       return;
     }
 
-    // Throw: enabled when a target is selected and fewer than 3 darts thrown this turn
     btnThrow.disabled = selectedTarget === null || pendingThrows.length >= 3;
-    // Bounce: enabled when there is at least one throw to revert this turn
     btnBounce.disabled = pendingThrows.length === 0;
-    // End turn: enabled any time during your turn
+    btnUndoTurn.disabled = pendingThrows.length > 0 || !gameState.turnHistory || gameState.turnHistory.length === 0;
     btnEnd.disabled = false;
   }
 

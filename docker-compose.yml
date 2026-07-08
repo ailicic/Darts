@@ -7,8 +7,35 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
+      - DATABASE_URL=postgresql://darts:darts123@postgres:5432/darts
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: darts-postgres
+    environment:
+      - POSTGRES_USER=darts
+      - POSTGRES_PASSWORD=darts123
+      - POSTGRES_DB=darts
     volumes:
-      - darts-data:/data
+      - darts-db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: node_exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     restart: unless-stopped
 
   prometheus:
@@ -25,6 +52,7 @@ services:
     restart: unless-stopped
     depends_on:
       - darts
+      - node_exporter
 
   grafana:
     image: grafana/grafana:latest
@@ -35,15 +63,16 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_INSTALL_PLUGINS=
-      - GF_SERVER_ROOT_URL=https://ilicic.dev/grafana/
-      - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./provisioning:/etc/grafana/provisioning
+      - ./dashboards:/etc/grafana/provisioning/dashboards
     restart: unless-stopped
     depends_on:
       - prometheus
 
 volumes:
   darts-data:
+  darts-db:
   prometheus-data:
   grafana-data:

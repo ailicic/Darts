@@ -7,3 +7,7 @@ scrape_configs:
     static_configs:
       - targets: ['darts:3000']
     metrics_path: '/metrics'
+
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node_exporter:9100']

@@ -1,0 +1,90 @@
+{
+  "dashboard": {
+    "title": "VM Resources",
+    "tags": ["vm", "system"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "CPU Usage %",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "CPU Usage"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {},
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Memory Usage %",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+            "legendFormat": "Memory"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {},
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Disk Usage %",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "(1 - (node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"})) * 100",
+            "legendFormat": "Disk"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {},
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Network Traffic",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "irate(node_network_receive_bytes_total{device!=\"lo\"}[5m])",
+            "legendFormat": "In: {{device}}"
+          },
+          {
+            "expr": "irate(node_network_transmit_bytes_total{device!=\"lo\"}[5m])",
+            "legendFormat": "Out: {{device}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {},
+            "unit": "Bps"
+          }
+        }
+      }
+    ],
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 1,
+    "uid": "vm-resources"
+  },
+  "overwrite": true
+}

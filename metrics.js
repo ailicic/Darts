@@ -33,6 +33,12 @@ const gameWinsTotal = new promClient.Counter({
   labelNames: ['player_name'],
 });
 
+const gamesPlayedTotal = new promClient.Counter({
+  name: 'games_played_total',
+  help: 'Total games played by each player',
+  labelNames: ['player_name'],
+});
+
 const dartsThrown = new promClient.Counter({
   name: 'darts_thrown_total',
   help: 'Total darts thrown',
@@ -49,6 +55,7 @@ module.exports = {
   activeGames,
   activePlayers,
   gameWinsTotal,
+  gamesPlayedTotal,
   dartsThrown,
   socketConnections,
   register: promClient.register,
