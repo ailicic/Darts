@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Darts – Big Screen</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d0d1a;
+      color: #eee;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.8rem 2rem;
+      background: #16213e;
+      border-bottom: 2px solid #e94560;
+    }
+
+    .header-title {
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #e94560;
+    }
+
+    #turn-indicator {
+      font-size: 1.1rem;
+      color: #a0d0ff;
+    }
+
+    #game-over-banner {
+      display: none;
+      background: #e94560;
+      color: #fff;
+      text-align: center;
+      padding: 1rem;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    .scoreboard-wrapper {
+      flex: 1;
+      overflow-x: auto;
+      padding: 1.5rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 600px;
+    }
+
+    th, td {
+      text-align: center;
+      padding: 0.65rem 0.9rem;
+      border: 1px solid #2a2a5a;
+    }
+
+    thead th {
+      background: #16213e;
+      color: #a0a0d0;
+      font-size: 1rem;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    thead th.player-header {
+      color: #e0e0ff;
+      font-size: 1.05rem;
+    }
+
+    .target-col {
+      background: #12122a;
+      color: #c0c0e0;
+      font-weight: 700;
+      font-size: 1.1rem;
+      width: 80px;
+    }
+
+    td.marks-cell {
+      font-size: 1.6rem;
+      letter-spacing: 2px;
+      min-width: 100px;
+    }
+
+    td.marks-cell.closed {
+      background: rgba(100, 230, 100, 0.08);
+      color: #80ff80;
+    }
+
+    tr.score-row td {
+      background: #16213e;
+      font-size: 1.3rem;
+      font-weight: 700;
+      padding: 0.85rem;
+    }
+
+    tr.score-row .score-value {
+      color: #e94560;
+    }
+
+    tr.score-row .score-label {
+      color: #a0a0d0;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .current-turn-badge {
+      display: inline-block;
+      background: #e94560;
+      color: #fff;
+      border-radius: 6px;
+      padding: 0.1rem 0.5rem;
+      font-size: 0.75rem;
+      vertical-align: middle;
+      margin-left: 0.4rem;
+    }
+
+    /* Recent throws feed */
+    .feed-panel {
+      background: #16213e;
+      border-top: 2px solid #2a2a5a;
+      padding: 0.8rem 2rem;
+      font-size: 0.95rem;
+    }
+
+    .feed-panel h3 {
+      color: #a0a0d0;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 0.5rem;
+    }
+
+    #throw-feed {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .throw-chip {
+      display: inline-flex;
+      align-items: center;
+      background: #0f3460;
+      border-radius: 20px;
+      padding: 0.3rem 0.8rem;
+      font-size: 0.9rem;
+      color: #eee;
+    }
+
+    .throw-chip.miss {
+      background: #3a1a1a;
+      color: #e94560;
+    }
+
+    .throw-chip.score {
+      background: #0a3a1a;
+      color: #80ff80;
+    }
+
+    .connecting {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      font-size: 1.5rem;
+      color: #a0a0d0;
+    }
+
+    /* ── QR Panel ──────────────────────────────────────────────────────────── */
+    #qr-panel {
+      position: fixed;
+      bottom: 80px; /* above the feed panel */
+      right: 1.5rem;
+      background: #16213e;
+      border: 2px solid #2a2a5a;
+      border-radius: 16px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      z-index: 10;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      transition: opacity 0.3s;
+    }
+
+    #qr-panel.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #qr-panel .qr-label {
+      color: #a0a0d0;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+
+    #qr-panel .qr-title {
+      color: #e0e0ff;
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    #qr-img {
+      width: 160px;
+      height: 160px;
+      border-radius: 8px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #qr-img svg {
+      width: 160px;
+      height: 160px;
+    }
+
+    #qr-panel .qr-url {
+      color: #666;
+      font-size: 0.7rem;
+      text-align: center;
+      word-break: break-all;
+      max-width: 160px;
+    }
+
+    /* ── Shared Tablet QR Panel ─────────────────────────────────────────────── */
+    #shared-qr-panel {
+      position: fixed;
+      bottom: 80px;
+      left: 1.5rem;
+      background: #16213e;
+      border: 2px solid #2a4a2a;
+      border-radius: 16px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      z-index: 10;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      transition: opacity 0.3s;
+    }
+
+    #shared-qr-panel.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #shared-qr-panel .qr-title {
+      color: #80ff80;
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    #shared-qr-panel .qr-label {
+      color: #a0a0d0;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+
+    #shared-qr-img {
+      width: 160px;
+      height: 160px;
+      border-radius: 8px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #shared-qr-img svg {
+      width: 160px;
+      height: 160px;
+    }
+
+    #shared-qr-panel .qr-url {
+      color: #666;
+      font-size: 0.7rem;
+      text-align: center;
+      word-break: break-all;
+      max-width: 160px;
+    }
+
+    #btn-toggle-qr {
+      position: fixed;
+      bottom: 80px;
+      right: 1.5rem;
+      background: #16213e;
+      border: 2px solid #e94560;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      font-size: 1.3rem;
+      cursor: pointer;
+      display: none; /* shown after QR loaded */
+      align-items: center;
+      justify-content: center;
+      color: #eee;
+      z-index: 11;
+      transition: background 0.15s;
+    }
+
+    #btn-toggle-qr.qr-visible {
+      display: none; /* only show toggle after QR panel is hidden */
+    }
+
+    /* ── Reset button ────────────────────────────────────────────────────────── */
+    #btn-reset {
+      background: transparent;
+      border: 1.5px solid #e94560;
+      color: #e94560;
+      border-radius: 8px;
+      padding: 0.4rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    #btn-reset:hover {
+      background: rgba(233, 69, 96, 0.12);
+    }
+
+    /* ── Shared modal styles ─────────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    .modal-box {
+      background: #16213e;
+      border: 2px solid #2a2a5a;
+      border-radius: 16px;
+      padding: 2rem;
+      max-width: 380px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    }
+
+    .modal-box h3 {
+      font-size: 1.4rem;
+      color: #e0e0ff;
+      margin-bottom: 0.6rem;
+    }
+
+    .modal-box p {
+      color: #a0a0d0;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .modal-btn-row {
+      display: flex;
+      gap: 0.8rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .modal-btn {
+      flex: 1;
+      padding: 0.75rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .modal-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .modal-btn.primary {
+      background: #e94560;
+      color: #fff;
+      border: none;
+    }
+
+    .modal-btn.primary:hover:not(:disabled) {
+      background: #c73652;
+    }
+
+    .modal-btn.secondary {
+      background: transparent;
+      color: #e94560;
+      border: 1.5px solid #e94560;
+    }
+
+    .modal-btn.secondary:hover:not(:disabled) {
+      background: rgba(233, 69, 96, 0.1);
+    }
+
+    .modal-btn-cancel {
+      background: transparent;
+      border: none;
+      color: #666;
+      font-size: 0.9rem;
+      cursor: pointer;
+      padding: 0.4rem;
+      width: 100%;
+      transition: color 0.15s;
+    }
+
+    .modal-btn-cancel:hover {
+      color: #aaa;
+    }
+
+    /* ── Countdown bar ───────────────────────────────────────────────────────── */
+    .countdown-bar-wrap {
+      margin-top: 1rem;
+      background: #2a2a5a;
+      border-radius: 99px;
+      height: 6px;
+      overflow: hidden;
+    }
+
+    .countdown-bar {
+      height: 100%;
+      background: #e94560;
+      border-radius: 99px;
+      transition: width 1s linear;
+    }
+
+    .countdown-text {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">🎯 DARTS – CUT THROAT</div>
+  <div id="turn-indicator">Loading…</div>
+</header>
+
+<div id="game-over-banner"></div>
+
+<!-- QR code panel – shown in corner so players can scan to join -->
+<div id="qr-panel">
+  <div class="qr-title">📱 Scan to Join</div>
+  <div id="qr-img"><span style="color:#555;font-size:0.8rem">Loading…</span></div>
+  <div class="qr-label">Point your phone camera here</div>
+  <div class="qr-url" id="qr-url"></div>
+</div>
+
+<!-- Shared tablet QR – scan to open shared scoring tablet -->
+<div id="shared-qr-panel">
+  <div class="qr-title">🖥️ Shared Tablet</div>
+  <div id="shared-qr-img"><span style="color:#555;font-size:0.8rem">Loading…</span></div>
+  <div class="qr-label">Score for any player</div>
+  <div class="qr-url" id="shared-qr-url"></div>
+</div>
+
+<div id="main-content">
+  <div class="connecting" id="connecting-msg">Connecting to game…</div>
+</div>
+
+<div class="feed-panel">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+    <h3>Recent Throws</h3>
+    <button id="btn-reset">🔄 Reset</button>
+  </div>
+  <div id="throw-feed"><span style="color:#555">—</span></div>
+</div>
+
+<!-- Reset confirmation modal -->
+<div id="reset-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="reset-modal-title">
+  <div class="modal-box">
+    <h3 id="reset-modal-title">Reset Game?</h3>
+    <p>Keep the same players (scores reset to 0) or start fresh with new players?</p>
+    <div class="modal-btn-row">
+      <button class="modal-btn secondary" id="btn-reset-same">👥 Same Players</button>
+      <button class="modal-btn primary" id="btn-reset-new">🏠 New Players</button>
+    </div>
+    <button class="modal-btn-cancel" id="btn-cancel-reset">Cancel</button>
+  </div>
+</div>
+
+<!-- Post-game modal -->
+<div id="postgame-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="postgame-modal-title">
+  <div class="modal-box">
+    <h3 id="postgame-modal-title">🏆 Game Over!</h3>
+    <p id="postgame-winner-text">What would you like to do next?</p>
+    <div class="modal-btn-row">
+      <button class="modal-btn secondary" id="btn-repeat-match">🔄 Repeat Match</button>
+      <button class="modal-btn primary" id="btn-new-players">🏠 New Players</button>
+    </div>
+    <div class="countdown-bar-wrap">
+      <div class="countdown-bar" id="postgame-bar" style="width:100%"></div>
+    </div>
+    <div class="countdown-text" id="postgame-countdown">Redirecting to home in 30s…</div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const gameId = location.pathname.split('/')[2];
+  const socket = io();
+
+  socket.emit('joinGame', { gameId });
+
+  socket.on('gameUpdate', (state) => {
+    renderGame(state);
+  });
+
+  // Also fetch initial state via REST in case socket is slow
+  fetch(`/api/games/${gameId}`)
+    .then(r => r.json())
+    .then(renderGame)
+    .catch(() => {});
+
+  // ── QR Code ───────────────────────────────────────────────────────────────
+  let qrLoaded = false;
+
+  function loadQR() {
+    if (qrLoaded) return;
+    fetch(`/api/games/${gameId}/join-qr`)
+      .then(r => {
+        if (!r.ok) throw new Error('QR not available');
+        return r.text();
+      })
+      .then(svg => {
+        qrLoaded = true;
+        const container = document.getElementById('qr-img');
+        container.innerHTML = svg;
+
+        // Show the join URL beneath the QR code
+        const joinUrl = `${location.origin}/join/${gameId}`;
+        document.getElementById('qr-url').textContent = joinUrl;
+      })
+      .catch(() => {
+        document.getElementById('qr-img').innerHTML =
+          '<span style="color:#e94560;font-size:0.75rem;padding:4px;">QR unavailable</span>';
+      });
+  }
+
+  let sharedQrLoaded = false;
+
+  function loadSharedQR() {
+    if (sharedQrLoaded) return;
+    fetch(`/api/games/${gameId}/shared-qr`)
+      .then(r => {
+        if (!r.ok) throw new Error('QR not available');
+        return r.text();
+      })
+      .then(svg => {
+        sharedQrLoaded = true;
+        const container = document.getElementById('shared-qr-img');
+        container.innerHTML = svg;
+
+        const sharedUrl = `${location.origin}/shared/${gameId}`;
+        document.getElementById('shared-qr-url').textContent = sharedUrl;
+      })
+      .catch(() => {
+        document.getElementById('shared-qr-img').innerHTML =
+          '<span style="color:#e94560;font-size:0.75rem;padding:4px;">QR unavailable</span>';
+      });
+  }
+
+  loadQR();
+  loadSharedQR();
+
+  let gameOverHandled = false;
+  let postGameTimer = null;
+
+  function showPostGameModal(winner) {
+    if (gameOverHandled) return;
+    gameOverHandled = true;
+
+    const modal = document.getElementById('postgame-modal');
+    const winnerText = document.getElementById('postgame-winner-text');
+    const countdownEl = document.getElementById('postgame-countdown');
+    const bar = document.getElementById('postgame-bar');
+
+    winnerText.textContent = winner
+      ? `${winner.name} wins! What would you like to do next?`
+      : 'What would you like to do next?';
+
+    modal.style.display = 'flex';
+
+    let secs = 30;
+    bar.style.width = '100%';
+    // Force reflow so the browser registers the initial width:100% before
+    // transitioning to width:0%; without this the CSS transition may not animate.
+    void bar.offsetWidth;
+    bar.style.width = '0%';
+
+    countdownEl.textContent = `Redirecting to home in ${secs}s…`;
+    postGameTimer = setInterval(() => {
+      secs -= 1;
+      countdownEl.textContent = `Redirecting to home in ${secs}s…`;
+      if (secs <= 0) {
+        clearInterval(postGameTimer);
+        postGameTimer = null;
+        location.href = '/';
+      }
+    }, 1000);
+  }
+
+  function renderGame(state) {
+    document.getElementById('connecting-msg')?.remove();
+
+    // Game over banner
+    const banner = document.getElementById('game-over-banner');
+    if (state.gameOver) {
+      const winner = state.players.find(p => p.id === state.winnerId);
+      banner.style.display = 'block';
+      banner.textContent = winner ? `🏆 ${winner.name} WINS!` : '🏆 Game Over!';
+      document.getElementById('turn-indicator').textContent = 'Game Over';
+      // Hide QR panels once game is over
+      document.getElementById('qr-panel').classList.add('hidden');
+      document.getElementById('shared-qr-panel').classList.add('hidden');
+
+      showPostGameModal(winner || null);
+    } else {
+      banner.style.display = 'none';
+      document.getElementById('qr-panel').classList.remove('hidden');
+      document.getElementById('shared-qr-panel').classList.remove('hidden');
+      const current = state.players.find(p => p.id === state.currentPlayerId);
+      const dartsLeft = 3 - (state.dartsThrown || 0);
+      document.getElementById('turn-indicator').textContent =
+        current ? `${current.name}'s turn — ${dartsLeft} dart${dartsLeft !== 1 ? 's' : ''} left` : '';
+    }
+
+    // Scoreboard
+    const targets = state.targets;
+    const players = state.players;
+
+    let html = `
+      <div class="scoreboard-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th class="target-col">Target</th>
+              ${players.map(p => `
+                <th class="player-header">
+                  ${esc(p.name)}
+                  ${p.id === state.currentPlayerId ? '<span class="current-turn-badge">▶ Turn</span>' : ''}
+                </th>
+              `).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${targets.map(t => `
+              <tr>
+                <td class="target-col">${t === 25 ? 'BULL' : t}</td>
+                ${players.map(p => {
+                  const marks = p.marks[t] || 0;
+                  const closed = marks >= 3;
+                  return `<td class="marks-cell ${closed ? 'closed' : ''}">${marksSymbol(marks)}</td>`;
+                }).join('')}
+              </tr>
+            `).join('')}
+            <tr class="score-row">
+              <td class="target-col"><span class="score-label">Score</span></td>
+              ${players.map(p => `<td><span class="score-value">${p.score}</span></td>`).join('')}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    document.getElementById('main-content').innerHTML = html;
+
+    // Throw feed – show current turn throws + last 2 completed turns
+    renderFeed(state);
+  }
+
+  function renderFeed(state) {
+    const feed = document.getElementById('throw-feed');
+    const items = [];
+
+    // Current turn throws
+    if (state.currentTurnThrows && state.currentTurnThrows.length > 0) {
+      const current = state.players.find(p => p.id === state.currentPlayerId);
+      state.currentTurnThrows.forEach(t => {
+        items.push(chipHtml(current?.name || '?', t));
+      });
+    }
+
+    // Last completed turn
+    const history = state.turnHistory || [];
+    const lastTurns = history.slice(-2).reverse();
+    lastTurns.forEach(turn => {
+      turn.throws.forEach(t => {
+        items.push(chipHtml(turn.playerName, t));
+      });
+    });
+
+    feed.innerHTML = items.length ? items.join('') : '<span style="color:#555">—</span>';
+  }
+
+  function chipHtml(playerName, throwData) {
+    const { target, multiplier, result } = throwData;
+    if (result.miss || target === 0) {
+      return `<span class="throw-chip miss">❌ ${esc(playerName)} missed</span>`;
+    }
+    const label = target === 25 ? 'Bull' : target;
+    const mul = multiplier === 3 ? 'T' : multiplier === 2 ? 'D' : 'S';
+    const hasScore = result.pointsAdded && Object.keys(result.pointsAdded).length > 0;
+    return `<span class="throw-chip ${hasScore ? 'score' : ''}">${mul}${label} – ${esc(playerName)}</span>`;
+  }
+
+  function marksSymbol(marks) {
+    if (marks === 0) return '';
+    if (marks === 1) return '/';
+    if (marks === 2) return 'X';
+    return '✓'; // 3 = closed
+  }
+
+  function esc(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Reset modal ────────────────────────────────────────────────────────────
+
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    document.getElementById('reset-modal').style.display = 'flex';
+  });
+
+  document.getElementById('btn-cancel-reset').addEventListener('click', () => {
+    document.getElementById('reset-modal').style.display = 'none';
+  });
+
+  // Close modal when clicking outside the box
+  document.getElementById('reset-modal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('reset-modal')) {
+      document.getElementById('reset-modal').style.display = 'none';
+    }
+  });
+
+  document.getElementById('btn-reset-new').addEventListener('click', () => {
+    location.href = '/';
+  });
+
+  document.getElementById('btn-reset-same').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-reset-same');
+    btn.disabled = true;
+    btn.textContent = 'Resetting…';
+
+    try {
+      const res = await fetch(`/api/games/${gameId}/reset`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        location.href = '/';
+        return;
+      }
+      // Stop any existing post-game timer before navigating
+      if (postGameTimer) {
+        clearInterval(postGameTimer);
+        postGameTimer = null;
+      }
+      location.href = `/display/${data.gameId}`;
+    } catch {
+      location.href = '/';
+    }
+  });
+
+  // ── Post-game modal ────────────────────────────────────────────────────────
+
+  document.getElementById('btn-repeat-match').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-repeat-match');
+    btn.disabled = true;
+    btn.textContent = 'Restarting…';
+
+    if (postGameTimer) {
+      clearInterval(postGameTimer);
+      postGameTimer = null;
+    }
+
+    try {
+      const res = await fetch(`/api/games/${gameId}/reset`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        location.href = '/';
+        return;
+      }
+      location.href = `/display/${data.gameId}`;
+    } catch {
+      location.href = '/';
+    }
+  });
+
+  document.getElementById('btn-new-players').addEventListener('click', () => {
+    if (postGameTimer) {
+      clearInterval(postGameTimer);
+      postGameTimer = null;
+    }
+    location.href = '/';
+  });
+</script>
+</body>
+</html>

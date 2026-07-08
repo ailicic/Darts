@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Darts – Cut Throat</title>
+  <link rel="stylesheet" href="/css/shared.css" />
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      background: #1a1a2e;
+      color: #eee;
+      font-family: 'Segoe UI', sans-serif;
+      padding: 2rem 0;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .logo {
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #e94560;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      color: #a0a0c0;
+      font-size: 1.1rem;
+    }
+
+    .main-container {
+      display: grid;
+      grid-template-columns: 1fr 480px 1fr;
+      gap: 2rem;
+      max-width: 1600px;
+      width: 100%;
+      padding: 0 2rem;
+    }
+
+    @media (max-width: 1200px) {
+      .main-container {
+        grid-template-columns: 1fr;
+        max-width: 600px;
+      }
+      .scoreboard-column {
+        display: none;
+      }
+    }
+
+    .center-column {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .card {
+      background: #16213e;
+      border-radius: 16px;
+      padding: 2rem 2.5rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    h2 {
+      margin: 0 0 1.5rem;
+      font-size: 1.4rem;
+      color: #e0e0ff;
+    }
+
+    #players-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Frequent Players ──────────────────────────────────────────────────── */
+    #frequent-section {
+      margin-bottom: 1.2rem;
+    }
+
+    #frequent-section h3 {
+      font-size: 0.95rem;
+      color: #a0a0c0;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: 0 0 0.7rem;
+    }
+
+    #frequent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .frequent-row {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.45rem 0.75rem;
+      border-radius: 8px;
+      background: #0f1e40;
+      border: 1.5px solid #2a2a5a;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .frequent-row:hover {
+      border-color: #e94560;
+      background: #12264a;
+    }
+
+    .frequent-row input[type="checkbox"] {
+      accent-color: #e94560;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .frequent-row .freq-name {
+      flex: 1;
+      font-weight: 600;
+      color: #e0e0ff;
+      font-size: 0.95rem;
+    }
+
+    .frequent-row .freq-stats {
+      font-size: 0.78rem;
+      color: #a0a0c0;
+    }
+
+    #frequent-section .no-frequent {
+      color: #555;
+      font-size: 0.9rem;
+      padding: 0.4rem 0;
+    }
+
+    .add-players-label {
+      font-size: 0.85rem;
+      color: #a0a0c0;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .player-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .player-row input {
+      flex: 1;
+      padding: 0.6rem 0.9rem;
+      border-radius: 8px;
+      border: 1.5px solid #2a2a5a;
+      background: #0f3460;
+      color: #eee;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .player-row input:focus {
+      border-color: #e94560;
+    }
+
+    .btn-remove {
+      background: transparent;
+      border: none;
+      color: #e94560;
+      font-size: 1.3rem;
+      cursor: pointer;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+
+    .btn-remove:hover {
+      background: rgba(233,69,96,0.15);
+    }
+
+    .btn-add {
+      background: transparent;
+      border: 1.5px dashed #2a2a5a;
+      color: #a0a0c0;
+      width: 100%;
+      padding: 0.6rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.2s;
+    }
+
+    .btn-add:hover {
+      border-color: #e94560;
+      color: #e94560;
+    }
+
+    .btn-start {
+      margin-top: 1.5rem;
+      width: 100%;
+      padding: 0.85rem;
+      background: #e94560;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.15rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .btn-start:hover {
+      background: #c73652;
+    }
+
+    .btn-start:active {
+      transform: scale(0.98);
+    }
+
+    #error-msg {
+      color: #e94560;
+      margin-top: 0.7rem;
+      font-size: 0.95rem;
+      min-height: 1.2rem;
+    }
+
+    .rules {
+      background: rgba(255,255,255,0.04);
+      border-radius: 12px;
+      padding: 1.2rem 1.5rem;
+      color: #8888aa;
+      font-size: 0.9rem;
+      line-height: 1.7;
+    }
+
+    .rules h3 {
+      color: #e0e0ff;
+      margin: 0 0 0.6rem;
+      font-size: 1rem;
+    }
+
+    .rules ul {
+      margin: 0;
+      padding-left: 1.2rem;
+    }
+
+    /* Scoreboards */
+    .scoreboard-column {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .scoreboard {
+      background: #16213e;
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    .scoreboard h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #e0e0ff;
+      margin: 0 0 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sb-date {
+      font-size: 0.75rem;
+      color: #a0a0c0;
+    }
+
+    .sb-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #2a2a5a;
+    }
+
+    .sb-row:last-child { border-bottom: none; }
+
+    .sb-rank {
+      width: 24px;
+      text-align: center;
+      font-size: 0.95rem;
+      flex-shrink: 0;
+    }
+
+    .sb-name {
+      flex: 1;
+      font-weight: 600;
+      color: #e0e0ff;
+      font-size: 0.95rem;
+      word-break: break-word;
+    }
+
+    .sb-wins {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: #e94560;
+      flex-shrink: 0;
+    }
+
+    .sb-wins-label {
+      font-size: 0.7rem;
+      color: #a0a0c0;
+      flex-shrink: 0;
+    }
+
+    .sb-pct {
+      font-size: 0.75rem;
+      color: #7878aa;
+      flex-shrink: 0;
+      min-width: 38px;
+      text-align: right;
+    }
+
+    .sb-empty {
+      color: #555;
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 1rem 0;
+    }
+
+    .sb-subtitle {
+      font-size: 0.75rem;
+      color: #7878aa;
+      margin-bottom: 0.6rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">🎯 DARTS</div>
+    <div class="subtitle">Cut Throat Mode</div>
+  </div>
+
+  <div class="main-container">
+    <!-- Left: Today's Scoreboard + 1v1 Today -->
+    <div class="scoreboard-column">
+      <div class="scoreboard">
+        <h3>
+          🏆 Today (3+ players)
+          <span class="sb-date" id="sb-today-date"></span>
+        </h3>
+        <div class="sb-subtitle">🥇 3 pts · 🥈 2 pts · 🥉 1 pt</div>
+        <div id="sb-today-body"><div class="sb-empty">Loading…</div></div>
+      </div>
+      <div class="scoreboard" style="margin-top:1rem;">
+        <h3>
+          ⚔️ Today (1v1)
+          <span class="sb-date" id="sb-today-1v1-date"></span>
+        </h3>
+        <div id="sb-today-1v1-body"><div class="sb-empty">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- Center: Game Setup -->
+    <div class="center-column">
+      <div class="card">
+        <h2>New Game</h2>
+
+        <!-- Frequent players (top 6 by games played) -->
+        <div id="frequent-section">
+          <h3>⭐ Frequent Players</h3>
+          <div id="frequent-list"><div class="no-frequent">Loading…</div></div>
+        </div>
+
+        <div class="add-players-label">Additional Players</div>
+        <div id="players-list"></div>
+        <button class="btn-add" id="btn-add">+ Add Player</button>
+        <div id="error-msg"></div>
+        <button class="btn-start" id="btn-start">Start Game</button>
+      </div>
+
+      <div class="rules">
+        <h3>Cut Throat Rules</h3>
+        <ul>
+          <li>Targets: 15, 16, 17, 18, 19, 20, Bull</li>
+          <li>Hit a number 3 times to <strong>close</strong> it</li>
+          <li>Once closed, extra hits add points to opponents who haven't closed it</li>
+          <li>Goal: close all numbers with the <strong>lowest score</strong></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Right: All-Time Scoreboard + 1v1 All-Time -->
+    <div class="scoreboard-column">
+      <div class="scoreboard">
+        <h3>
+          ⭐ All-Time (3+ players)
+        </h3>
+        <div id="sb-alltime-body"><div class="sb-empty">Loading…</div></div>
+      </div>
+      <div class="scoreboard" style="margin-top:1rem;">
+        <h3>
+          ⚔️ All-Time (1v1)
+        </h3>
+        <div id="sb-alltime-1v1-body"><div class="sb-empty">Loading…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const playersList = document.getElementById('players-list');
+    const btnAdd = document.getElementById('btn-add');
+    const btnStart = document.getElementById('btn-start');
+    const errorMsg = document.getElementById('error-msg');
+
+    function addPlayerRow(value = '') {
+      const row = document.createElement('div');
+      row.className = 'player-row';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = `Player ${playersList.children.length + 1}`;
+      input.maxLength = 30;
+      input.value = value;
+
+      const btn = document.createElement('button');
+      btn.className = 'btn-remove';
+      btn.textContent = '✕';
+      btn.title = 'Remove player';
+      btn.onclick = () => {
+        row.remove();
+      };
+
+      row.appendChild(input);
+      row.appendChild(btn);
+      playersList.appendChild(row);
+    }
+
+    btnAdd.addEventListener('click', () => {
+      if (playersList.children.length < 8) {
+        addPlayerRow('');
+      }
+    });
+
+    // ── Frequent Players ────────────────────────────────────────────────────
+
+    // Fisher-Yates shuffle – randomises the array in-place and returns it.
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function loadFrequentPlayers() {
+      fetch('/api/results')
+        .then(r => r.json())
+        .then(renderFrequentPlayers)
+        .catch(() => {
+          document.getElementById('frequent-list').innerHTML =
+            '<div class="no-frequent">Could not load players</div>';
+        });
+    }
+
+    function renderFrequentPlayers(results) {
+      const container = document.getElementById('frequent-list');
+
+      if (!results || results.length === 0) {
+        container.innerHTML = '<div class="no-frequent">No games played yet</div>';
+        return;
+      }
+
+      // Count overall stats: only 3+ player games
+      const RANK_PTS = { 1: 3, 2: 2, 3: 1 };
+      const stats = {};
+      results.filter(r => r.players.length >= 3).forEach(r => {
+        r.players.forEach(name => {
+          if (!stats[name]) stats[name] = { played: 0, points: 0, wins: 0 };
+          stats[name].played++;
+        });
+        if (r.placements) {
+          // 3+ player game: award placement points
+          r.placements.forEach(({ name, rank }) => {
+            if (!stats[name]) stats[name] = { played: 0, points: 0, wins: 0 };
+            stats[name].points += (RANK_PTS[rank] || 0);
+          });
+        } else if (r.winner) {
+          // 1v1 game: count as a win
+          if (!stats[r.winner]) stats[r.winner] = { played: 0, points: 0, wins: 0 };
+          stats[r.winner].wins++;
+        }
+      });
+
+      // Top 6 by games played
+      const top6 = Object.entries(stats)
+        .sort((a, b) => b[1].played - a[1].played)
+        .slice(0, 6);
+
+      if (top6.length === 0) {
+        container.innerHTML = '<div class="no-frequent">No games played yet</div>';
+        return;
+      }
+
+      container.innerHTML = top6.map(([name, { played, points }]) => {
+        const parts = [];
+        if (points > 0) parts.push(points + 'pts');
+        parts.push(played + 'G');
+        return `
+          <label class="frequent-row">
+            <input type="checkbox" class="frequent-cb" value="${escapeAttr(name)}" />
+            <span class="freq-name">${escapeHtml(name)}</span>
+            <span class="freq-stats">${parts.join(' / ')}</span>
+          </label>
+        `;
+      }).join('');
+    }
+
+    loadFrequentPlayers();
+
+    // ── Start Game ──────────────────────────────────────────────────────────
+
+    btnStart.addEventListener('click', async () => {
+      errorMsg.textContent = '';
+
+      // Collect checked frequent players
+      const checkedNames = Array.from(
+        document.querySelectorAll('.frequent-cb:checked')
+      ).map(cb => cb.value.trim()).filter(Boolean);
+
+      // Collect additional typed names
+      const typedNames = Array.from(playersList.querySelectorAll('input'))
+        .map(i => i.value.trim()).filter(Boolean);
+
+      // Merge, deduplicate (case-insensitive), preserve first occurrence
+      const seen = new Set();
+      const names = [];
+      [...checkedNames, ...typedNames].forEach(n => {
+        const key = n.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          names.push(n);
+        }
+      });
+
+      if (names.length < 2) {
+        errorMsg.textContent = 'Please select or enter at least 2 players.';
+        return;
+      }
+
+      // Randomise player order
+      shuffle(names);
+
+      btnStart.disabled = true;
+      btnStart.textContent = 'Starting…';
+
+      try {
+        const res = await fetch('/api/games', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerNames: names }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          errorMsg.textContent = data.error || 'Failed to create game.';
+          btnStart.disabled = false;
+          btnStart.textContent = 'Start Game';
+          return;
+        }
+
+        // Open the display page in a new tab (for big screen)
+        window.open(`/display/${data.gameId}`, '_blank');
+
+        // Show mobile links
+        showMobileLinks(data.gameId, data.players);
+      } catch (err) {
+        errorMsg.textContent = 'Network error, please try again.';
+        btnStart.disabled = false;
+        btnStart.textContent = 'Start Game';
+      }
+    });
+
+    function showMobileLinks(gameId, players) {
+      document.querySelector('.card').innerHTML = `
+        <h2>Game Created! 🎯</h2>
+        <p style="color:#a0a0c0;margin-bottom:1.2rem;">
+          The big screen display has been opened in a new tab.<br>
+          Share these links with each player:
+        </p>
+        ${players.map((p) => `
+          <div style="margin-bottom:1rem;">
+            <div style="color:#e0e0ff;font-weight:600;margin-bottom:0.3rem;">${escapeHtml(p.name)}</div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <input readonly value="${location.origin}/play/${gameId}/${p.id}"
+                style="flex:1;padding:0.5rem 0.8rem;border-radius:8px;border:1.5px solid #2a2a5a;
+                       background:#0f3460;color:#eee;font-size:0.9rem;outline:none;" />
+              <button onclick="copyLink(this)" data-url="${location.origin}/play/${gameId}/${p.id}"
+                style="padding:0.5rem 0.8rem;background:#e94560;color:#fff;border:none;
+                       border-radius:8px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">
+                Copy
+              </button>
+            </div>
+          </div>
+        `).join('')}
+        <button onclick="location.reload()"
+          style="margin-top:1rem;width:100%;padding:0.75rem;background:transparent;
+                 color:#e94560;border:1.5px solid #e94560;border-radius:10px;
+                 font-size:1rem;cursor:pointer;">
+          New Game
+        </button>
+      `;
+    }
+
+    function copyLink(btn) {
+      navigator.clipboard.writeText(btn.dataset.url).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => (btn.textContent = 'Copy'), 1800);
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function escapeAttr(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Scoreboards ──────────────────────────────────────────────────────
+
+    function isSameDay(isoDate) {
+      const d = new Date(isoDate);
+      const now = new Date();
+      return d.getFullYear() === now.getFullYear() &&
+             d.getMonth() === now.getMonth() &&
+             d.getDate() === now.getDate();
+    }
+
+    function rankEmoji(i) {
+      return ['🥇','🥈','🥉'][i] || `${i + 1}.`;
+    }
+
+    function renderScoreboards(results) {
+      const sbTodayDate = document.getElementById('sb-today-date');
+      const sbToday1v1Date = document.getElementById('sb-today-1v1-date');
+      const dateStr = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      sbTodayDate.textContent = dateStr;
+      sbToday1v1Date.textContent = dateStr;
+
+      const todayResults = results.filter(r => isSameDay(r.date));
+
+      // Split by game size
+      const multi = results.filter(r => r.players.length >= 3);
+      const multiToday = todayResults.filter(r => r.players.length >= 3);
+      const duel = results.filter(r => r.players.length === 2);
+      const duelToday = todayResults.filter(r => r.players.length === 2);
+
+      const RANK_PTS = { 1: 3, 2: 2, 3: 1 };
+
+      // 3+ player scoreboard (points)
+      function buildPointsBoard(resultsList) {
+        if (resultsList.length === 0) return '<div class="sb-empty">No games yet</div>';
+
+        const stats = {};
+        resultsList.forEach(r => {
+          r.players.forEach(name => {
+            if (!stats[name]) stats[name] = { points: 0, played: 0 };
+            stats[name].played++;
+          });
+          if (r.placements) {
+            r.placements.forEach(({ name, rank }) => {
+              if (!stats[name]) stats[name] = { points: 0, played: 0 };
+              stats[name].points += (RANK_PTS[rank] || 0);
+            });
+          }
+        });
+
+        const sorted = Object.entries(stats).sort((a, b) => b[1].points - a[1].points);
+        return sorted.map(([name, { points, played }], i) => `
+          <div class="sb-row">
+            <span class="sb-rank">${rankEmoji(i)}</span>
+            <span class="sb-name">${escapeHtml(name)}</span>
+            <span class="sb-wins">${points}</span>
+            <span class="sb-wins-label">pts</span>
+            <span class="sb-pct">${played}G</span>
+          </div>
+        `).join('');
+      }
+
+      // 1v1 scoreboard (wins)
+      function buildWinsBoard(resultsList) {
+        if (resultsList.length === 0) return '<div class="sb-empty">No games yet</div>';
+
+        const stats = {};
+        resultsList.forEach(r => {
+          r.players.forEach(name => {
+            if (!stats[name]) stats[name] = { wins: 0, played: 0 };
+            stats[name].played++;
+          });
+          if (r.winner) {
+            if (!stats[r.winner]) stats[r.winner] = { wins: 0, played: 0 };
+            stats[r.winner].wins++;
+          }
+        });
+
+        const sorted = Object.entries(stats).sort((a, b) => b[1].wins - a[1].wins);
+        return sorted.map(([name, { wins, played }], i) => {
+          const pct = played > 0 ? Math.round((wins / played) * 100) : 0;
+          return `
+            <div class="sb-row">
+              <span class="sb-rank">${rankEmoji(i)}</span>
+              <span class="sb-name">${escapeHtml(name)}</span>
+              <span class="sb-wins">${wins}</span>
+              <span class="sb-wins-label">W</span>
+              <span class="sb-pct">${pct}%</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      document.getElementById('sb-today-body').innerHTML = buildPointsBoard(multiToday);
+      document.getElementById('sb-alltime-body').innerHTML = buildPointsBoard(multi);
+      document.getElementById('sb-today-1v1-body').innerHTML = buildWinsBoard(duelToday);
+      document.getElementById('sb-alltime-1v1-body').innerHTML = buildWinsBoard(duel);
+    }
+
+    function loadScorecards() {
+      fetch('/api/results')
+        .then(r => r.json())
+        .then(renderScoreboards)
+        .catch(() => {
+          document.getElementById('sb-today-body').innerHTML =
+            '<div class="sb-empty">Error loading</div>';
+          document.getElementById('sb-alltime-body').innerHTML =
+            '<div class="sb-empty">Error loading</div>';
+        });
+    }
+
+    loadScorecards();
+    // Refresh every 30 seconds
+    let refreshInterval = setInterval(loadScorecards, 30000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        clearInterval(refreshInterval);
+      } else {
+        loadScorecards();
+        refreshInterval = setInterval(loadScorecards, 30000);
+      }
+    });
+  </script>
+</body>
+</html>
