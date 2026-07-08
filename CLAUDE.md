@@ -28,7 +28,10 @@ docker compose logs -f          # watch logs
 docker compose down             # stop
 ```
 
-The app serves on http://localhost:3000
+**Access URLs (when running locally):**
+- App: http://localhost:3000
+- Prometheus: http://localhost:9090 (metrics scraper)
+- Grafana: http://localhost:3001 (dashboard, login: admin/admin)
 
 ## Architecture Overview
 
@@ -40,8 +43,9 @@ The app serves on http://localhost:3000
 ### Key Files
 
 **Server-side:**
-- `server.js` — Express app, REST API endpoints, Socket.IO, in-memory `games` store
+- `server.js` — Express app, REST API endpoints, Socket.IO, in-memory `games` store, persistent wins/results
 - `gameLogic.js` — Pure game logic: player creation, throw processing, win condition checking
+- `metrics.js` — Prometheus metrics (HTTP latency/requests, active games, darts thrown, Socket.IO connections)
 
 **Client-side:**
 - `public/index.html` — Setup page (enter player names, create game)
@@ -108,10 +112,10 @@ Key functions in `gameLogic.js`:
 - Page loads limited to 120 per minute per IP (protects `/`, `/display/:gameId`, `/join/:gameId`, `/play/:gameId/:playerId`)
 
 ### Deployment Notes
-- Dockerfile uses Node 20 Alpine, runs as non-root user `darts`
-- Entrypoint: `npm install --omit=dev` must be run on the host **before** `docker build` (node_modules are copied into image, not installed inside)
 - PORT defaults to 3000 (can override with env var)
-- Games stored in-memory: restarting the server clears all active games
+- Games stored in-memory: restarting the server clears all active games (but wins/results are persisted)
+- Metrics endpoint: `GET /metrics` (Prometheus format; used by Prometheus scraper)
+- For HTTP proxies (nginx, Cloudflare): QR code generation respects `X-Forwarded-Proto` and `X-Forwarded-Host` headers
 
 ## Testing
 
@@ -130,3 +134,32 @@ Each HTML page uses vanilla JS with Socket.IO for real-time updates:
 - **mobile.html** — Joins via Socket.IO, shows throw interface (target buttons, multiplier selector, throw/end-turn buttons)
 
 Each page fetches its own game state on load via `GET /api/games/:gameId` and then stays in sync with Socket.IO.
+
+## Monitoring & Observability
+
+**Prometheus (http://localhost:9090):**
+- Scrapes metrics from `/metrics` endpoint (darts app) and node_exporter (9100)
+- Custom metrics: HTTP request latency/counts, active games, active players, game wins, darts thrown, Socket.IO connections
+- Config: `prometheus.yml` — adjust scrape intervals or add new targets there
+
+**Grafana (http://localhost:3001):**
+- Visualizes Prometheus metrics via pre-built dashboards
+- Dashboards defined in `dashboards/` (JSON files)
+- Provisioning config: `provisioning/dashboards.yaml` — auto-loads dashboards on startup
+- Default login: admin/admin
+
+**Docker Compose:**
+- `docker-compose.yml` includes Prometheus, Grafana, and node_exporter services
+- Volumes: `darts-data` (game wins/results), `prometheus-data` (time-series), `grafana-data` (dashboards/config)
+
+## Persistent Data
+
+**Wins & Results:**
+- On-disk storage: `wins.json` (list of `{ playerName, date }`), `results.json` (list of `{ players: [], winner, date }`)
+- Loaded into memory on startup; updated asynchronously after each game ends
+- Data directory: `DATA_DIR` env var (defaults to `/data`; Docker mounts this as a named volume)
+
+**Docker Build:**
+- Must run `npm install --omit=dev` on the host **before** `docker build` (node_modules is COPY'd, not installed in container)
+- Non-root user: `darts` (app runs as non-root for security)
+- Ensure `metrics.js` is included in build (auto-required by server.js)

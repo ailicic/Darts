@@ -1,0 +1,63 @@
+{
+  "title": "Darts Games Analytics",
+  "description": "Player Statistics - Wins, Games Played, Win Percentage",
+  "timezone": "browser",
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "version": 1,
+  "uid": "darts-games-analytics",
+  "tags": ["darts", "games"],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Player Statistics",
+      "type": "table",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 16},
+      "targets": [
+        {
+          "expr": "topk(100, gameWinsTotal)",
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Value"},
+            "properties": [
+              {"id": "custom.width", "value": 100},
+              {"id": "unit", "value": "short"},
+              {"id": "displayName", "value": "Games Won"}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "name"},
+            "properties": [
+              {"id": "custom.width", "value": 200},
+              {"id": "displayName", "value": "Player Name"}
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Games Won",
+            "desc": true
+          }
+        ]
+      }
+    }
+  ]
+}

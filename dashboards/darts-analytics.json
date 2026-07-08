@@ -1,0 +1,146 @@
+{
+  "dashboard": {
+    "title": "Darts Analytics",
+    "tags": ["darts", "games"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Total Wins",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(gameWinsTotal)",
+            "legendFormat": "Total Wins"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {},
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Total Darts Thrown",
+        "type": "stat",
+        "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "dartsThrown",
+            "legendFormat": "Darts"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {},
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Active Games",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "activeGames",
+            "legendFormat": "Games"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {},
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Active Players",
+        "type": "stat",
+        "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "activePlayers",
+            "legendFormat": "Players"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {},
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Wins by Player (Top 10)",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "topk(10, gameWinsTotal)",
+            "legendFormat": "{{name}}"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "HTTP Request Rate",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(httpRequestTotal[5m])) by (method, route)",
+            "legendFormat": "{{method}} {{route}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {},
+            "unit": "reqps"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "API Response Time (ms)",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(httpRequestDuration_bucket[5m])) * 1000",
+            "legendFormat": "p95 {{route}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {},
+            "unit": "ms"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Socket Connections",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "socketConnections",
+            "legendFormat": "Active Connections"
+          }
+        ]
+      }
+    ],
+    "refresh": "10s",
+    "schemaVersion": 27,
+    "version": 1,
+    "uid": "darts-analytics"
+  },
+  "overwrite": true
+}

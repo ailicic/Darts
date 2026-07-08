@@ -21,8 +21,25 @@ services:
     environment:
       - PORT=3000
       - DATABASE_URL=postgresql://darts:darts123@postgres:5432/darts
+    depends_on:
+      - postgres
     volumes:
       - darts-data:/data
+    restart: unless-stopped
+
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: node_exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     restart: unless-stopped
     depends_on:
       - postgres
@@ -41,6 +58,7 @@ services:
     restart: unless-stopped
     depends_on:
       - darts
+      - node_exporter
 
   grafana:
     image: grafana/grafana:latest
@@ -53,6 +71,8 @@ services:
       - GF_INSTALL_PLUGINS=
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./provisioning:/etc/grafana/provisioning
+      - ./dashboards:/etc/grafana/provisioning/dashboards
     restart: unless-stopped
     depends_on:
       - prometheus
