@@ -468,6 +468,236 @@
       z-index: 50;
     }
   </style>
+
+  <!-- ══ DevOps / observability dashboard theme — toggled by the Theme dropdown (default = off) ══ -->
+  <style id="theme-devops" media="not all">
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+    :root {
+      --d-bg:        #0d1117;
+      --d-panel:     #161b22;
+      --d-inset:     #010409;
+      --d-line:      #30363d;
+      --d-line-soft: #21262d;
+      --d-blue:      #58a6ff;
+      --d-green:     #3fb950;
+      --d-green-btn: #238636;
+      --d-green-hi:  #2ea043;
+      --d-amber:     #d29922;
+      --d-red:       #f85149;
+      --d-purple:    #bc8cff;
+      --d-text:      #c9d1d9;
+      --d-bright:    #e6edf3;
+      --d-muted:     #8b949e;
+      --d-faint:     #6e7681;
+      --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    }
+
+    /* ── Animations ─────────────────────────────────────────── */
+    @keyframes pipeflow { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+    @keyframes livepulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.8); } }
+    @keyframes shimmer { 0% { background-position: -300px 0; } 100% { background-position: 300px 0; } }
+    @keyframes blink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+    @keyframes cellpop { 0% { transform: scale(0.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes chipin { from { transform: translateY(6px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    body {
+      background: var(--d-bg) !important;
+      color: var(--d-text) !important;
+      font-family: 'Inter', system-ui, sans-serif !important;
+      background-image:
+        radial-gradient(900px 500px at 100% -10%, rgba(88,166,255,0.06), transparent 60%),
+        radial-gradient(700px 400px at 0% 110%, rgba(63,185,80,0.05), transparent 55%);
+      background-attachment: fixed;
+    }
+
+    /* Header with animated pipeline underline */
+    header {
+      position: relative;
+      background: var(--d-panel) !important;
+      border-bottom: 1px solid var(--d-line) !important;
+    }
+    header::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--d-blue), var(--d-green), transparent);
+      background-size: 200% 100%; animation: pipeflow 3.5s linear infinite;
+    }
+    .header-title {
+      color: var(--d-bright) !important;
+      font-family: var(--mono) !important;
+      letter-spacing: 1px !important;
+      font-weight: 700 !important;
+      display: flex; align-items: center;
+    }
+    .header-title::after {
+      content: "▋"; color: var(--d-green); margin-left: 6px; animation: blink 1.1s step-end infinite;
+    }
+    #turn-indicator {
+      color: var(--d-green) !important;
+      font-family: var(--mono) !important;
+      font-size: 0.9rem !important;
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid var(--d-line); border-radius: 99px;
+      padding: 4px 12px; background: rgba(63,185,80,0.08);
+    }
+    #turn-indicator::before {
+      content: ""; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--d-green); box-shadow: 0 0 8px var(--d-green);
+      animation: livepulse 1.4s ease-in-out infinite;
+    }
+    .connecting {
+      color: var(--d-muted) !important;
+      font-family: var(--mono) !important;
+      background: linear-gradient(90deg, var(--d-muted) 25%, var(--d-bright) 50%, var(--d-muted) 75%);
+      background-size: 600px 100%;
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 2.2s linear infinite;
+    }
+
+    /* Winner banner */
+    #game-over-banner {
+      position: relative; overflow: hidden;
+      background: rgba(63,185,80,0.12) !important;
+      color: var(--d-green) !important;
+      border-top: 1px solid var(--d-green); border-bottom: 1px solid var(--d-green);
+      text-shadow: none !important; letter-spacing: 3px !important;
+      font-family: var(--mono) !important;
+    }
+    #game-over-banner::after {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(63,185,80,0.18), transparent);
+      background-size: 200% 100%; animation: pipeflow 2.5s linear infinite;
+    }
+
+    /* Scoreboard */
+    th, td { border: 1px solid var(--d-line) !important; }
+    thead th {
+      background: var(--d-inset) !important;
+      color: var(--d-muted) !important;
+      font-family: var(--mono) !important;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    thead th.player-header { color: var(--d-bright) !important; }
+    .target-col {
+      background: var(--d-panel) !important;
+      color: var(--d-blue) !important;
+      font-family: var(--mono) !important;
+    }
+    td.marks-cell { color: var(--d-text) !important; font-family: var(--mono) !important; }
+    td.marks-cell.closed {
+      background: rgba(63,185,80,0.12) !important;
+      color: var(--d-green) !important;
+    }
+    td.marks-cell.closed { animation: cellpop 0.25s ease; }
+    tr.score-row td { background: var(--d-inset) !important; }
+    tr.score-row .score-value {
+      color: var(--d-green) !important;
+      font-family: var(--mono) !important;
+    }
+    tr.score-row .score-label { color: var(--d-muted) !important; font-family: var(--mono) !important; }
+    .current-turn-badge {
+      background: var(--d-blue) !important;
+      color: #04121f !important;
+      font-family: var(--mono) !important;
+    }
+
+    /* Feed */
+    .feed-panel {
+      position: relative;
+      background: var(--d-panel) !important;
+      border-top: 1px solid var(--d-line) !important;
+    }
+    .feed-panel h3 {
+      color: var(--d-muted) !important;
+      font-family: var(--mono) !important;
+      text-transform: uppercase; letter-spacing: 2px;
+      display: flex; align-items: center;
+    }
+    .feed-panel h3::before { content: "▍"; color: var(--d-blue); margin-right: 7px; }
+    .throw-chip {
+      background: var(--d-inset) !important;
+      border: 1px solid var(--d-line) !important;
+      color: var(--d-text) !important;
+      border-radius: 6px !important;
+      font-family: var(--mono) !important;
+      animation: chipin 0.3s ease;
+    }
+    .throw-chip.miss { background: rgba(248,81,73,0.10) !important; color: var(--d-red) !important; border-color: rgba(248,81,73,0.3) !important; }
+    .throw-chip.score { background: rgba(63,185,80,0.10) !important; color: var(--d-green) !important; border-color: rgba(63,185,80,0.3) !important; }
+
+    /* QR panels */
+    #qr-panel, #shared-qr-panel {
+      background: var(--d-panel) !important;
+      border: 1px solid var(--d-line) !important;
+      border-radius: 8px !important;
+    }
+    #qr-panel .qr-title, #shared-qr-panel .qr-title {
+      color: var(--d-bright) !important; font-family: var(--mono) !important;
+    }
+    .qr-label { color: var(--d-muted) !important; font-family: var(--mono) !important; }
+    .qr-url { color: var(--d-faint) !important; font-family: var(--mono) !important; }
+
+    #btn-toggle-qr {
+      background: var(--d-panel) !important;
+      border: 1px solid var(--d-blue) !important;
+      color: var(--d-blue) !important;
+    }
+
+    /* Reset button */
+    #btn-reset {
+      background: transparent !important;
+      border: 1px solid var(--d-line) !important;
+      color: var(--d-muted) !important;
+      border-radius: 6px !important;
+      font-family: var(--mono) !important;
+      text-transform: uppercase; letter-spacing: 1px;
+      transition: all 0.15s;
+    }
+    #btn-reset:hover { border-color: var(--d-red) !important; color: var(--d-red) !important; background: rgba(248,81,73,0.08) !important; }
+
+    /* Modals */
+    .modal-box {
+      position: relative; overflow: hidden;
+      background: var(--d-panel) !important;
+      border: 1px solid var(--d-line) !important;
+      border-radius: 10px !important;
+      box-shadow: 0 20px 60px -20px rgba(0,0,0,0.9) !important;
+    }
+    .modal-box::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--d-blue), var(--d-green), transparent);
+      background-size: 200% 100%; animation: pipeflow 3s linear infinite;
+    }
+    .modal-box h3 { color: var(--d-bright) !important; font-family: var(--mono) !important; letter-spacing: 1px; }
+    .modal-box p { color: var(--d-muted) !important; }
+    .modal-btn.primary {
+      background: var(--d-green-btn) !important;
+      color: #fff !important;
+      border: 1px solid rgba(240,246,252,0.1) !important;
+      border-radius: 6px !important;
+      font-family: var(--mono) !important;
+    }
+    .modal-btn.primary:hover:not(:disabled) { background: var(--d-green-hi) !important; }
+    .modal-btn.secondary {
+      background: transparent !important;
+      color: var(--d-blue) !important;
+      border: 1px solid var(--d-line) !important;
+      border-radius: 6px !important;
+      font-family: var(--mono) !important;
+    }
+    .modal-btn.secondary:hover:not(:disabled) { background: rgba(88,166,255,0.1) !important; border-color: var(--d-blue) !important; }
+    .modal-btn-cancel { color: var(--d-faint) !important; font-family: var(--mono) !important; }
+    .modal-btn-cancel:hover { color: var(--d-muted) !important; }
+
+    .countdown-bar-wrap { background: var(--d-line-soft) !important; }
+    .countdown-bar { background: linear-gradient(90deg, var(--d-blue), var(--d-green)) !important; }
+    .countdown-text { color: var(--d-faint) !important; font-family: var(--mono) !important; }
+
+    #version-badge { color: var(--d-faint) !important; }
+  </style>
+
+  <script src="/theme-toggle.js"></script>
 </head>
 <body>
 
@@ -758,9 +988,13 @@
 
   function marksSymbol(marks) {
     if (marks === 0) return '';
-    if (marks === 1) return '/';
-    if (marks === 2) return 'X';
-    return '✓'; // 3 = closed
+    // Cricket-style marks: 1 = single line, 2 = crossed X, 3 = circled X (closed)
+    const s = 'stroke="currentColor" stroke-width="2.4" stroke-linecap="round"';
+    const l1 = `<line x1="5.5" y1="18.5" x2="18.5" y2="5.5" ${s}/>`;
+    const l2 = `<line x1="5.5" y1="5.5" x2="18.5" y2="18.5" ${s}/>`;
+    const cross = marks === 1 ? l1 : l1 + l2;
+    const ring = marks >= 3 ? '<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>' : '';
+    return `<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" aria-hidden="true" style="display:inline-block;vertical-align:middle">${ring}${cross}</svg>`;
   }
 
   function esc(str) {
