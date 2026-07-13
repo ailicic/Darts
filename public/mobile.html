@@ -929,9 +929,13 @@
 
   function marksSymbol(marks) {
     if (marks === 0) return '';
-    if (marks === 1) return '/';
-    if (marks === 2) return 'X';
-    return '✓';
+    // Cricket-style marks: 1 = single line, 2 = crossed X, 3 = circled X (closed)
+    const s = 'stroke="currentColor" stroke-width="2.4" stroke-linecap="round"';
+    const l1 = `<line x1="5.5" y1="18.5" x2="18.5" y2="5.5" ${s}/>`;
+    const l2 = `<line x1="5.5" y1="5.5" x2="18.5" y2="18.5" ${s}/>`;
+    const cross = marks === 1 ? l1 : l1 + l2;
+    const ring = marks >= 3 ? '<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>' : '';
+    return `<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" aria-hidden="true" style="display:inline-block;vertical-align:middle">${ring}${cross}</svg>`;
   }
 
   function showToast(msg) {
