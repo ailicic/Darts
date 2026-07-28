@@ -130,6 +130,25 @@
       color: #80ff80;
     }
 
+    /* ATW: next required target */
+    .target-btn.atw-next {
+      border-color: #e9a020;
+      background: rgba(233,160,32,0.15);
+      color: #e9a020;
+    }
+
+    .target-btn.atw-next.selected {
+      border-color: var(--red);
+      background: rgba(233,69,96,0.15);
+      color: var(--red);
+    }
+
+    /* ATW: future targets */
+    .target-btn.atw-upcoming {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
     .target-btn .marks-indicator {
       font-size: 0.85rem;
       color: #a0a0d0;
@@ -613,7 +632,17 @@
     }
 
     document.getElementById('player-name').textContent = me.name;
-    document.getElementById('score-badge').textContent = `${me.score} pts`;
+
+    // Mode-specific score badge
+    const mode = state.gameMode || 'cutThroat';
+    if (mode === '501' || mode === '301') {
+      document.getElementById('score-badge').textContent = `${me.score} left`;
+    } else if (mode === 'atw') {
+      const ATW_LEN = 21;
+      document.getElementById('score-badge').textContent = `${me.score}/${ATW_LEN}`;
+    } else {
+      document.getElementById('score-badge').textContent = `${me.score} pts`;
+    }
 
     if (state.gameOver) {
       showGameOver(state, me);
@@ -661,14 +690,30 @@
     document.getElementById('game-over').style.display = 'flex';
 
     const winner = state.players.find(p => p.id === state.winnerId);
+    const mode = state.gameMode || 'cutThroat';
+
     if (winner && winner.id === me.id) {
       document.getElementById('game-over-title').textContent = '🏆 You Win!';
-      document.getElementById('game-over-msg').textContent =
-        `Congratulations! You closed all numbers with ${me.score} points.`;
+      if (mode === '501' || mode === '301') {
+        document.getElementById('game-over-msg').textContent = 'Congratulations! You hit double out!';
+      } else if (mode === 'atw') {
+        document.getElementById('game-over-msg').textContent = 'You hit all targets in order!';
+      } else {
+        document.getElementById('game-over-msg').textContent =
+          `Congratulations! You closed all numbers with ${me.score} points.`;
+      }
     } else {
       document.getElementById('game-over-title').textContent = 'Game Over';
-      document.getElementById('game-over-msg').textContent =
-        winner ? `${esc(winner.name)} wins with ${winner.score} points. Your score: ${me.score}.` : '';
+      if (mode === '501' || mode === '301') {
+        document.getElementById('game-over-msg').textContent =
+          winner ? `${esc(winner.name)} won! Your remaining: ${me.score}.` : '';
+      } else if (mode === 'atw') {
+        document.getElementById('game-over-msg').textContent =
+          winner ? `${esc(winner.name)} finished first! Your progress: ${me.score}/21.` : '';
+      } else {
+        document.getElementById('game-over-msg').textContent =
+          winner ? `${esc(winner.name)} wins with ${winner.score} points. Your score: ${me.score}.` : '';
+      }
     }
 
     if (!gameOverRedirectTimer) {
@@ -691,10 +736,32 @@
 
   function renderTargetGrid(me, state) {
     const grid = document.getElementById('target-grid');
-    const targets = state.targets; // [15,16,17,18,19,20,25]
+    const targets = state.targets;
+    const mode = state.gameMode || 'cutThroat';
 
     grid.innerHTML = '';
+    // Reset to default 4-column layout; specific modes may override
+    grid.style.gridTemplateColumns = 'repeat(4, 1fr)';
 
+    if (mode === 'atw') {
+      renderATWGrid(me, state, grid, targets);
+    } else if (mode === '501' || mode === '301') {
+      renderX01Grid(me, state, grid, targets);
+    } else {
+      // cutThroat or cricket – marks-based grid
+      renderCricketGrid(me, state, grid, targets);
+    }
+
+    // Miss button (always present)
+    const missBtn = document.createElement('button');
+    missBtn.className = 'target-btn miss-btn' + (selectedTarget === 0 ? ' selected' : '');
+    missBtn.dataset.target = '0';
+    missBtn.innerHTML = '<span>Miss</span><span class="marks-indicator">❌</span>';
+    missBtn.addEventListener('click', () => selectTarget(0));
+    grid.appendChild(missBtn);
+  }
+
+  function renderCricketGrid(me, state, grid, targets) {
     targets.forEach(t => {
       const marks = me.marks[t] || 0;
       const closed = marks >= 3;
@@ -712,14 +779,50 @@
       btn.addEventListener('click', () => selectTarget(t));
       grid.appendChild(btn);
     });
+  }
 
-    // Miss button
-    const missBtn = document.createElement('button');
-    missBtn.className = 'target-btn miss-btn' + (selectedTarget === 0 ? ' selected' : '');
-    missBtn.dataset.target = '0';
-    missBtn.innerHTML = '<span>Miss</span><span class="marks-indicator">❌</span>';
-    missBtn.addEventListener('click', () => selectTarget(0));
-    grid.appendChild(missBtn);
+  function renderX01Grid(me, state, grid, targets) {
+    // Show all 1-20 plus BULL in a 5-column grid
+    targets.forEach(t => {
+      const btn = document.createElement('button');
+      btn.className = 'target-btn' + (selectedTarget === t ? ' selected' : '');
+      btn.dataset.target = t;
+      const label = t === 25 ? 'BULL' : String(t);
+      btn.innerHTML = `<span>${label}</span>`;
+      btn.addEventListener('click', () => selectTarget(t));
+      grid.appendChild(btn);
+    });
+    // Adjust grid to 5 columns for x01 (21 targets + miss)
+    grid.style.gridTemplateColumns = 'repeat(5, 1fr)';
+  }
+
+  function renderATWGrid(me, state, grid, targets) {
+    const currentIdx = me.targetIndex || 0;
+    targets.forEach((t, idx) => {
+      const btn = document.createElement('button');
+      const isNext = idx === currentIdx;
+      const isDone = idx < currentIdx;
+      btn.dataset.target = t;
+
+      if (isDone) {
+        btn.className = 'target-btn closed-by-me';
+        btn.disabled = true;
+      } else if (isNext) {
+        btn.className = 'target-btn atw-next' + (selectedTarget === t ? ' selected' : '');
+        btn.addEventListener('click', () => selectTarget(t));
+      } else {
+        btn.className = 'target-btn atw-upcoming';
+        btn.disabled = true;
+      }
+
+      const label = t === 25 ? 'BULL' : String(t);
+      btn.innerHTML = isDone
+        ? `<span>${label}</span><span class="marks-indicator">✓</span>`
+        : `<span>${label}</span>`;
+
+      grid.appendChild(btn);
+    });
+    grid.style.gridTemplateColumns = 'repeat(5, 1fr)';
   }
 
   function selectTarget(t) {

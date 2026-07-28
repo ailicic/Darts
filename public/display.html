@@ -703,7 +703,7 @@
 <body>
 
 <header>
-  <div class="header-title">🎯 DARTS – CUT THROAT</div>
+  <div class="header-title" id="header-title">🎯 DARTS – CUT THROAT</div>
   <div id="turn-indicator">Loading…</div>
 </header>
 
@@ -886,6 +886,17 @@
   function renderGame(state) {
     document.getElementById('connecting-msg')?.remove();
 
+    // Game mode header
+    const modeLabels = {
+      cutThroat: '🎯 DARTS – CUT THROAT',
+      cricket: '🏏 DARTS – CRICKET',
+      '501': '🔢 DARTS – 501',
+      '301': '🔢 DARTS – 301',
+      atw: '🌍 DARTS – AROUND THE WORLD',
+    };
+    const headerTitle = document.getElementById('header-title');
+    if (headerTitle) headerTitle.textContent = modeLabels[state.gameMode] || '🎯 DARTS';
+
     // Game over banner
     const banner = document.getElementById('game-over-banner');
     if (state.gameOver) {
@@ -908,11 +919,28 @@
         current ? `${current.name}'s turn — ${dartsLeft} dart${dartsLeft !== 1 ? 's' : ''} left` : '';
     }
 
-    // Scoreboard
+    // Scoreboard – render differently per mode
+    const mode = state.gameMode || 'cutThroat';
+    let html;
+    if (mode === '501' || mode === '301') {
+      html = renderX01Scoreboard(state);
+    } else if (mode === 'atw') {
+      html = renderATWScoreboard(state);
+    } else {
+      // cutThroat or cricket – marks-based display
+      html = renderCricketScoreboard(state);
+    }
+
+    document.getElementById('main-content').innerHTML = html;
+
+    // Throw feed – show current turn throws + last 2 completed turns
+    renderFeed(state);
+  }
+
+  function renderCricketScoreboard(state) {
     const targets = state.targets;
     const players = state.players;
-
-    let html = `
+    return `
       <div class="scoreboard-wrapper">
         <table>
           <thead>
@@ -945,11 +973,90 @@
         </table>
       </div>
     `;
+  }
 
-    document.getElementById('main-content').innerHTML = html;
+  function renderX01Scoreboard(state) {
+    const players = state.players;
+    return `
+      <div class="scoreboard-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th class="target-col">Player</th>
+              <th style="text-align:center;">Remaining</th>
+              <th style="text-align:center;">Darts</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${players.map(p => {
+              const isCurrent = p.id === state.currentPlayerId;
+              const dartsUsed = state.turnHistory
+                ? state.turnHistory.filter(t => t.playerId === p.id).reduce((n, t) => n + t.throws.length, 0)
+                : 0;
+              return `
+                <tr class="${isCurrent ? 'score-row' : ''}">
+                  <td class="target-col" style="text-align:left;">
+                    ${esc(p.name)}
+                    ${isCurrent ? '<span class="current-turn-badge">▶ Turn</span>' : ''}
+                  </td>
+                  <td style="text-align:center;font-size:2rem;font-weight:800;color:${p.score <= 40 ? '#80ff80' : '#e94560'};">
+                    ${p.score}
+                  </td>
+                  <td style="text-align:center;color:#a0a0d0;">
+                    ${dartsUsed}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
 
-    // Throw feed – show current turn throws + last 2 completed turns
-    renderFeed(state);
+  function renderATWScoreboard(state) {
+    const players = state.players;
+    const ATW = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,25];
+    return `
+      <div class="scoreboard-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th class="target-col">Player</th>
+              <th style="text-align:center;">Progress</th>
+              <th style="text-align:center;">Next</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${players.map(p => {
+              const isCurrent = p.id === state.currentPlayerId;
+              const done = p.targetIndex || 0;
+              const next = done < ATW.length ? ATW[done] : '✓';
+              const pct = Math.round((done / ATW.length) * 100);
+              return `
+                <tr class="${isCurrent ? 'score-row' : ''}">
+                  <td class="target-col" style="text-align:left;">
+                    ${esc(p.name)}
+                    ${isCurrent ? '<span class="current-turn-badge">▶ Turn</span>' : ''}
+                  </td>
+                  <td style="text-align:center;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;justify-content:center;">
+                      <div style="background:#2a2a5a;border-radius:4px;height:10px;width:120px;overflow:hidden;">
+                        <div style="height:100%;width:${pct}%;background:#e94560;border-radius:4px;transition:width 0.4s;"></div>
+                      </div>
+                      <span style="color:#a0a0d0;font-size:0.9rem;">${done}/${ATW.length}</span>
+                    </div>
+                  </td>
+                  <td style="text-align:center;font-size:1.3rem;font-weight:700;color:#e0e0ff;">
+                    ${next === 25 ? 'BULL' : next}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
   }
 
   function renderFeed(state) {
