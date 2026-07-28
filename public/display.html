@@ -1022,9 +1022,9 @@
         <table>
           <thead>
             <tr>
-              <th class="target-col">Player</th>
+              <th class="player-header" style="text-align:left;">Player</th>
               <th style="text-align:center;">Progress</th>
-              <th style="text-align:center;">Next</th>
+              <th style="text-align:center;width:80px;">Next</th>
             </tr>
           </thead>
           <tbody>
@@ -1035,7 +1035,7 @@
               const pct = Math.round((done / ATW.length) * 100);
               return `
                 <tr class="${isCurrent ? 'score-row' : ''}">
-                  <td class="target-col" style="text-align:left;">
+                  <td style="text-align:left;padding:0.65rem 0.9rem;border:1px solid #2a2a5a;">
                     ${esc(p.name)}
                     ${isCurrent ? '<span class="current-turn-badge">▶ Turn</span>' : ''}
                   </td>
