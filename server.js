@@ -242,13 +242,14 @@ app.post('/api/games/:gameId/throw', async (req, res) => {
 
       // Save to DB
       await saveWin(winner.name, now);
-      await saveResult(game.players.map((p) => p.name), winner.name, finalPlacements, now);
+      await saveResult(game.players.map((p) => p.name), winner.name, mode, finalPlacements, now);
 
       // Update in-memory cache
       wins.push({ playerName: winner.name, date: now });
       results.push({
         players: game.players.map((p) => p.name),
         winner: winner.name,
+        gameMode: mode,
         placements: finalPlacements,
         date: now,
       });

@@ -17,10 +17,12 @@ async function initDb() {
     '  id SERIAL PRIMARY KEY,' +
     '  players TEXT[] NOT NULL,' +
     '  winner VARCHAR(60) NOT NULL,' +
+    '  game_mode VARCHAR(20),' +
     '  placements JSONB,' +
     '  date TIMESTAMPTZ NOT NULL DEFAULT NOW()' +
     ')'
   );
+  await pool.query('ALTER TABLE results ADD COLUMN IF NOT EXISTS game_mode VARCHAR(20)');
 }
 
 async function loadWins() {
@@ -33,14 +35,14 @@ async function saveWin(playerName, date) {
 }
 
 async function loadResults() {
-  const { rows } = await pool.query('SELECT players, winner, placements, date FROM results ORDER BY id');
+  const { rows } = await pool.query('SELECT players, winner, game_mode AS "gameMode", placements, date FROM results ORDER BY id');
   return rows;
 }
 
-async function saveResult(players, winner, placements, date) {
+async function saveResult(players, winner, gameMode, placements, date) {
   await pool.query(
-    'INSERT INTO results (players, winner, placements, date) VALUES ($1, $2, $3, $4)',
-    [players, winner, JSON.stringify(placements), date]
+    'INSERT INTO results (players, winner, game_mode, placements, date) VALUES ($1, $2, $3, $4, $5)',
+    [players, winner, gameMode, JSON.stringify(placements), date]
   );
 }
 
