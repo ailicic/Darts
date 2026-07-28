@@ -400,6 +400,157 @@
     }
     .btn-new-game:active { transform: scale(0.97); }
   </style>
+
+  <!-- ══ DevOps / observability dashboard theme — toggled by the Theme dropdown ══ -->
+  <style id="theme-devops" media="not all">
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+    :root {
+      --d-bg:        #0d1117;
+      --d-panel:     #161b22;
+      --d-inset:     #010409;
+      --d-line:      #30363d;
+      --d-line-soft: #21262d;
+      --d-blue:      #58a6ff;
+      --d-green:     #3fb950;
+      --d-green-btn: #238636;
+      --d-green-hi:  #2ea043;
+      --d-red:       #f85149;
+      --d-text:      #c9d1d9;
+      --d-bright:    #e6edf3;
+      --d-muted:     #8b949e;
+      --d-faint:     #6e7681;
+      --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    }
+
+    @keyframes pipeflow { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+    @keyframes livepulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.8); } }
+    @keyframes blink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+    @keyframes cellpop { 0% { transform: scale(0.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+    body {
+      background: var(--d-bg) !important;
+      color: var(--d-text) !important;
+      font-family: 'Inter', system-ui, sans-serif !important;
+      background-image:
+        radial-gradient(900px 500px at 100% -10%, rgba(88,166,255,0.06), transparent 60%),
+        radial-gradient(700px 400px at 0% 110%, rgba(63,185,80,0.05), transparent 55%);
+      background-attachment: fixed;
+    }
+
+    header {
+      position: relative;
+      background: var(--d-panel) !important;
+      border-bottom: 1px solid var(--d-line) !important;
+    }
+    header::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--d-blue), var(--d-green), transparent);
+      background-size: 200% 100%; animation: pipeflow 3.5s linear infinite;
+    }
+
+    .header-title {
+      color: var(--d-bright) !important;
+      font-family: var(--mono) !important;
+      letter-spacing: 1px !important;
+      font-weight: 700 !important;
+    }
+    .header-title::after {
+      content: "▋"; color: var(--d-green); margin-left: 6px; animation: blink 1.1s step-end infinite;
+    }
+
+    #current-turn-banner { color: var(--d-green) !important; font-family: var(--mono) !important; }
+    #current-turn-banner .turn-name { color: var(--d-bright) !important; }
+
+    #darts-left-badge {
+      background: var(--d-inset) !important;
+      border: 1px solid var(--d-line) !important;
+      color: var(--d-muted) !important;
+      font-family: var(--mono) !important;
+    }
+
+    #scoreboard-panel { border-right: 1px solid var(--d-line) !important; }
+
+    .scoreboard-table th,
+    .scoreboard-table td { border: 1px solid var(--d-line) !important; }
+    .scoreboard-table thead th {
+      background: var(--d-inset) !important;
+      color: var(--d-muted) !important;
+      font-family: var(--mono) !important;
+    }
+    .scoreboard-table thead th.player-col { color: var(--d-bright) !important; }
+    .scoreboard-table thead th.player-col.active-turn {
+      color: var(--d-blue) !important;
+      background: rgba(88,166,255,0.08) !important;
+    }
+    .scoreboard-table .target-col {
+      background: var(--d-panel) !important;
+      color: var(--d-blue) !important;
+      font-family: var(--mono) !important;
+    }
+    .scoreboard-table td.marks-cell { color: var(--d-text) !important; font-family: var(--mono) !important; }
+    .scoreboard-table td.marks-cell.closed {
+      background: rgba(63,185,80,0.12) !important;
+      color: var(--d-green) !important;
+      animation: cellpop 0.25s ease;
+    }
+    .scoreboard-table tr.score-row td { background: var(--d-inset) !important; }
+    .score-value { color: var(--d-green) !important; font-family: var(--mono) !important; }
+
+    .section-label { color: var(--d-muted) !important; font-family: var(--mono) !important; }
+
+    .target-btn {
+      background: var(--d-panel) !important;
+      border: 1px solid var(--d-line) !important;
+      color: var(--d-text) !important;
+      font-family: var(--mono) !important;
+    }
+    .target-btn.selected {
+      border-color: var(--d-blue) !important;
+      background: rgba(88,166,255,0.12) !important;
+    }
+    .target-btn.closed {
+      border-color: var(--d-green) !important;
+      background: rgba(63,185,80,0.08) !important;
+      color: var(--d-green) !important;
+    }
+    .target-btn .marks-indicator { color: var(--d-muted) !important; font-family: var(--mono) !important; }
+    .target-btn.closed .marks-indicator { color: var(--d-green) !important; }
+    .target-btn.miss-btn { background: rgba(248,81,73,0.06) !important; border-color: rgba(248,81,73,0.3) !important; color: var(--d-red) !important; }
+    .target-btn.miss-btn.selected { border-color: var(--d-red) !important; background: rgba(248,81,73,0.15) !important; }
+
+    .mul-btn {
+      background: var(--d-panel) !important;
+      border: 1px solid var(--d-line) !important;
+      color: var(--d-text) !important;
+      font-family: var(--mono) !important;
+    }
+    .mul-btn.selected { border-color: var(--d-blue) !important; background: rgba(88,166,255,0.12) !important; color: var(--d-blue) !important; }
+
+    .throw-slot { background: var(--d-panel) !important; border-color: var(--d-line) !important; color: var(--d-faint) !important; font-family: var(--mono) !important; }
+    .throw-slot.filled { border-color: var(--d-blue) !important; color: var(--d-bright) !important; background: var(--d-inset) !important; }
+    .throw-slot.miss { border-color: rgba(248,81,73,0.4) !important; color: var(--d-red) !important; background: rgba(248,81,73,0.06) !important; }
+
+    .btn-throw { background: var(--d-green-btn) !important; border-radius: 6px !important; font-family: var(--mono) !important; }
+    .btn-throw:disabled { background: #555 !important; }
+    .btn-bounce { border-color: var(--d-line) !important; color: var(--d-muted) !important; font-family: var(--mono) !important; }
+    .btn-end-turn { color: var(--d-blue) !important; border-color: var(--d-blue) !important; font-family: var(--mono) !important; }
+    .btn-end-turn:disabled { opacity: 0.3 !important; }
+
+    #toast { background: var(--d-panel) !important; border-color: var(--d-line) !important; font-family: var(--mono) !important; }
+
+    #game-over-overlay { background: rgba(1,4,9,0.88) !important; }
+    .game-over-box {
+      background: var(--d-panel) !important;
+      border: 1px solid var(--d-line) !important;
+    }
+    .game-over-box h2 { color: var(--d-green) !important; font-family: var(--mono) !important; }
+    .game-over-box p { color: var(--d-muted) !important; }
+    .btn-rematch { background: var(--d-green-btn) !important; font-family: var(--mono) !important; border-radius: 6px !important; }
+    .btn-new-game { color: var(--d-muted) !important; border-color: var(--d-line) !important; font-family: var(--mono) !important; }
+  </style>
+
+  <script src="/theme-toggle.js"></script>
 </head>
 <body>
 
@@ -423,11 +574,13 @@
     <div class="section-label">Select target</div>
     <div class="target-grid" id="target-grid"></div>
 
+    <div id="multiplier-section">
     <div class="section-label">Multiplier</div>
     <div class="multiplier-row">
       <button class="mul-btn selected" data-mul="1">Single</button>
       <button class="mul-btn" data-mul="2">Double</button>
       <button class="mul-btn" data-mul="3">Triple</button>
+    </div>
     </div>
 
     <div class="section-label">This turn</div>
@@ -507,6 +660,15 @@
   // ── Scoreboard ─────────────────────────────────────────────────────────────
 
   function renderScoreboard(state) {
+    const mode = state.gameMode || 'cutThroat';
+    if (mode === 'atw') {
+      renderATWScoreboard(state);
+    } else {
+      renderCricketScoreboard(state);
+    }
+  }
+
+  function renderCricketScoreboard(state) {
     const { players, targets, currentPlayerId } = state;
     const table = document.getElementById('scoreboard-table');
 
@@ -537,29 +699,87 @@
     table.innerHTML = `<thead>${thead}</thead><tbody>${tbody}</tbody>`;
   }
 
+  function renderATWScoreboard(state) {
+    const { players, currentPlayerId } = state;
+    const ATW = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,25];
+    const table = document.getElementById('scoreboard-table');
+
+    let thead = '<tr><th style="text-align:left;padding:0.35rem 0.4rem;border:1px solid var(--border);">Player</th>' +
+      '<th style="text-align:center;padding:0.35rem 0.4rem;border:1px solid var(--border);">Progress</th>' +
+      '<th style="text-align:center;padding:0.35rem 0.4rem;border:1px solid var(--border);width:44px;">Next</th></tr>';
+
+    let tbody = '';
+    players.forEach(p => {
+      const isActive = p.id === currentPlayerId;
+      const done = p.targetIndex || 0;
+      const next = done < ATW.length ? (ATW[done] === 25 ? 'BULL' : ATW[done]) : '✓';
+      const pct = Math.round((done / ATW.length) * 100);
+      const rowStyle = isActive ? 'background:var(--card);font-weight:700;' : '';
+      tbody += `<tr style="${rowStyle}">` +
+        `<td style="text-align:left;padding:0.35rem 0.4rem;border:1px solid var(--border);font-size:0.85rem;">` +
+        `${esc(p.name)}${isActive ? ' ▶' : ''}</td>` +
+        `<td style="padding:0.35rem 0.4rem;border:1px solid var(--border);">` +
+        `<div style="display:flex;align-items:center;gap:0.3rem;">` +
+        `<div style="background:#2a2a5a;border-radius:3px;height:8px;flex:1;overflow:hidden;">` +
+        `<div style="height:100%;width:${pct}%;background:var(--red);border-radius:3px;transition:width 0.4s;"></div>` +
+        `</div><span style="color:#a0a0d0;font-size:0.75rem;white-space:nowrap;">${done}/${ATW.length}</span></div></td>` +
+        `<td style="text-align:center;padding:0.35rem 0.4rem;border:1px solid var(--border);font-weight:700;color:#e0e0ff;">${next}</td>` +
+        `</tr>`;
+    });
+
+    table.innerHTML = `<thead>${thead}</thead><tbody>${tbody}</tbody>`;
+  }
+
   // ── Target grid ────────────────────────────────────────────────────────────
 
   function renderTargetGrid(state) {
+    const mode = state.gameMode || 'cutThroat';
+    const isATW = mode === 'atw';
+
+    // Show/hide multiplier (no effect in ATW)
+    const mulSection = document.getElementById('multiplier-section');
+    if (mulSection) mulSection.style.display = isATW ? 'none' : '';
+
     const current = state.players.find(p => p.id === state.currentPlayerId);
     const grid = document.getElementById('target-grid');
     grid.innerHTML = '';
 
-    state.targets.forEach(t => {
-      const marks = current ? (current.marks[t] || 0) : 0;
-      const closed = marks >= 3;
+    if (isATW) {
+      const ATW = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,25];
+      const doneCount = current ? (current.targetIndex || 0) : 0;
+      ATW.forEach((t, idx) => {
+        const alreadyHit = idx < doneCount;
+        const isNext = idx === doneCount;
+        const btn = document.createElement('button');
+        btn.className = 'target-btn' +
+          (alreadyHit ? ' closed' : '') +
+          (isNext && selectedTarget === t ? ' selected' : '');
+        btn.dataset.target = t;
+        const label = t === 25 ? 'BULL' : t;
+        const indicator = alreadyHit ? '✓' : (isNext ? '→' : '');
+        btn.innerHTML = `<span>${label}</span><span class="marks-indicator">${indicator}</span>`;
+        if (!alreadyHit) btn.addEventListener('click', () => selectTarget(t));
+        else btn.disabled = true;
+        grid.appendChild(btn);
+      });
+    } else {
+      state.targets.forEach(t => {
+        const marks = current ? (current.marks[t] || 0) : 0;
+        const closed = marks >= 3;
 
-      const btn = document.createElement('button');
-      btn.className = 'target-btn' +
-        (closed ? ' closed' : '') +
-        (selectedTarget === t ? ' selected' : '');
-      btn.dataset.target = t;
-      btn.innerHTML = `
-        <span>${t === 25 ? 'BULL' : t}</span>
-        <span class="marks-indicator">${marksSymbol(marks)}</span>
-      `;
-      btn.addEventListener('click', () => selectTarget(t));
-      grid.appendChild(btn);
-    });
+        const btn = document.createElement('button');
+        btn.className = 'target-btn' +
+          (closed ? ' closed' : '') +
+          (selectedTarget === t ? ' selected' : '');
+        btn.dataset.target = t;
+        btn.innerHTML = `
+          <span>${t === 25 ? 'BULL' : t}</span>
+          <span class="marks-indicator">${marksSymbol(marks)}</span>
+        `;
+        btn.addEventListener('click', () => selectTarget(t));
+        grid.appendChild(btn);
+      });
+    }
 
     const missBtn = document.createElement('button');
     missBtn.className = 'target-btn miss-btn' + (selectedTarget === 0 ? ' selected' : '');
