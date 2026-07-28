@@ -7,6 +7,7 @@ jest.mock('../db', () => ({
 }));
 
 const request = require('supertest');
+const db = require('../db');
 const { app, server, games } = require('../server');
 
 afterAll((done) => {
@@ -501,5 +502,24 @@ describe('POST /api/games with gameMode=atw', () => {
     const { gameId } = await createGameMode(['Alice', 'Bob'], 'invalidMode');
     const state = await request(app).get(`/api/games/${gameId}`);
     expect(state.body.gameMode).toBe('cutThroat');
+  });
+
+  test('saves completed result with selected game mode', async () => {
+    const { gameId, players } = await createGameMode(['Alice', 'Bob'], 'atw');
+    games[gameId].players[0].targetIndex = 20;
+    games[gameId].players[0].score = 20;
+
+    const res = await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 25, multiplier: 1 });
+
+    expect(res.status).toBe(200);
+    expect(db.saveResult).toHaveBeenCalledWith(
+      expect.any(Array),
+      'Alice',
+      'atw',
+      null,
+      expect.any(String)
+    );
   });
 });

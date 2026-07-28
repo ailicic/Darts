@@ -1002,6 +1002,9 @@
     }
 
     modeSelect.addEventListener('change', updateModeUI);
+    modeSelect.addEventListener('change', () => {
+      renderScoreboards(cachedResults);
+    });
     updateModeUI();
 
     // ── Scoreboards ──────────────────────────────────────────────────────
@@ -1111,6 +1114,8 @@
 
     function renderScoreboards(results) {
       cachedResults = results;
+      const selectedMode = modeSelect?.value || 'cutThroat';
+      const modeResults = results.filter((r) => (r.gameMode || 'cutThroat') === selectedMode);
 
       const dateStr = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
       const monthStr = new Date().toLocaleString(undefined, { month: 'short', year: 'numeric' });
@@ -1119,14 +1124,14 @@
       document.getElementById('sb-month-label').textContent = monthStr;
       document.getElementById('sb-month-1v1-label').textContent = monthStr;
 
-      const todayResults = results.filter(r => isSameDay(r.date));
-      const monthResults = results.filter(r => isSameMonth(r.date));
+      const todayResults = modeResults.filter(r => isSameDay(r.date));
+      const monthResults = modeResults.filter(r => isSameMonth(r.date));
 
       // Split by game size
-      const multi = results.filter(r => r.players.length >= 3);
+      const multi = modeResults.filter(r => r.players.length >= 3);
       const multiToday = todayResults.filter(r => r.players.length >= 3);
       const multiMonth = monthResults.filter(r => r.players.length >= 3);
-      const duel = results.filter(r => r.players.length === 2);
+      const duel = modeResults.filter(r => r.players.length === 2);
       const duelToday = todayResults.filter(r => r.players.length === 2);
       const duelMonth = monthResults.filter(r => r.players.length === 2);
 
@@ -1192,27 +1197,37 @@
     // Expand/collapse handlers
     document.getElementById('btn-alltime-more').addEventListener('click', () => {
       expandState.alltime = !expandState.alltime;
-      const multi = cachedResults.filter(r => r.players.length >= 3);
-      const duel = cachedResults.filter(r => r.players.length === 2);
+      const mode = modeSelect?.value || 'cutThroat';
+      const modeResults = cachedResults.filter(r => (r.gameMode || 'cutThroat') === mode);
+      const multi = modeResults.filter(r => r.players.length >= 3);
+      const duel = modeResults.filter(r => r.players.length === 2);
       renderAlltimeBoard(multi, duel);
     });
 
     document.getElementById('btn-alltime-1v1-more').addEventListener('click', () => {
       expandState.alltime1v1 = !expandState.alltime1v1;
-      const multi = cachedResults.filter(r => r.players.length >= 3);
-      const duel = cachedResults.filter(r => r.players.length === 2);
+      const mode = modeSelect?.value || 'cutThroat';
+      const modeResults = cachedResults.filter(r => (r.gameMode || 'cutThroat') === mode);
+      const multi = modeResults.filter(r => r.players.length >= 3);
+      const duel = modeResults.filter(r => r.players.length === 2);
       renderAlltimeBoard(multi, duel);
     });
 
     document.getElementById('btn-month-more').addEventListener('click', () => {
       expandState.month = !expandState.month;
-      const monthResults = cachedResults.filter(r => isSameMonth(r.date));
+      const mode = modeSelect?.value || 'cutThroat';
+      const monthResults = cachedResults
+        .filter(r => (r.gameMode || 'cutThroat') === mode)
+        .filter(r => isSameMonth(r.date));
       renderMonthBoard(monthResults.filter(r => r.players.length >= 3), monthResults.filter(r => r.players.length === 2));
     });
 
     document.getElementById('btn-month-1v1-more').addEventListener('click', () => {
       expandState.month1v1 = !expandState.month1v1;
-      const monthResults = cachedResults.filter(r => isSameMonth(r.date));
+      const mode = modeSelect?.value || 'cutThroat';
+      const monthResults = cachedResults
+        .filter(r => (r.gameMode || 'cutThroat') === mode)
+        .filter(r => isSameMonth(r.date));
       renderMonthBoard(monthResults.filter(r => r.players.length >= 3), monthResults.filter(r => r.players.length === 2));
     });
 
