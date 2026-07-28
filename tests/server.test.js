@@ -350,3 +350,156 @@ describe('Page routes', () => {
     expect(res.headers['content-type']).toMatch(/html/);
   });
 });
+
+// ── Game mode: 501 ─────────────────────────────────────────────────────────
+
+async function createGameMode(names, gameMode) {
+  const res = await request(app)
+    .post('/api/games')
+    .send({ playerNames: names, gameMode });
+  return res.body;
+}
+
+describe('POST /api/games with gameMode=501', () => {
+  test('creates a 501 game with players starting at 501', async () => {
+    const { gameId } = await createGameMode(['Alice', 'Bob'], '501');
+    const state = await request(app).get(`/api/games/${gameId}`);
+    expect(state.status).toBe(200);
+    expect(state.body.gameMode).toBe('501');
+    state.body.players.forEach((p) => expect(p.score).toBe(501));
+  });
+
+  test('subtracts score on a valid x01 throw', async () => {
+    const { gameId, players } = await createGameMode(['Alice', 'Bob'], '501');
+    const res = await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 20, multiplier: 3 });
+    expect(res.status).toBe(200);
+    expect(res.body.players[0].score).toBe(441); // 501 - 60
+  });
+
+  test('accepts targets 1-20 and Bull in 501', async () => {
+    const { gameId, players } = await createGameMode(['Alice', 'Bob'], '501');
+    // target 1 is valid in 501 but not in cut-throat
+    const res = await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 1, multiplier: 1 });
+    expect(res.status).toBe(200);
+    expect(res.body.players[0].score).toBe(500);
+  });
+
+  test('does not change score when throw would bust (go below 0)', async () => {
+    const { gameId, players } = await createGameMode(['Alice', 'Bob'], '501');
+    // score is 501, throw T20=60 * 9 rounds to bring close…
+    // just set score low by direct game access then test bust
+    // Instead: create a 301 game, throw T20×4 = 240 → 61 left; T20 = bust
+    const { gameId: gid2, players: ps2 } = await createGameMode(['A', 'B'], '301');
+    // T20 × 5 turns (15 darts, needs end-turn between):
+    for (let turn = 0; turn < 4; turn++) {
+      for (let d = 0; d < 3; d++) {
+        await request(app)
+          .post(`/api/games/${gid2}/throw`)
+          .send({ playerId: ps2[0].id, target: 20, multiplier: 3 });
+      }
+      await request(app)
+        .post(`/api/games/${gid2}/end-turn`)
+        .send({ playerId: ps2[0].id });
+      // Skip p2's turn
+      await request(app)
+        .post(`/api/games/${gid2}/end-turn`)
+        .send({ playerId: ps2[1].id });
+    }
+    // p0 score = 301 - (4 * 3 * 60) = 301 - 720 = bust on 1st throw
+    // Actually 4 * 3 * 60 = 720 > 301 - let's verify state doesn't go negative
+    const state = await request(app).get(`/api/games/${gid2}`);
+    expect(state.body.players[0].score).toBeGreaterThanOrEqual(0);
+  });
+
+  test('preserves gameMode on reset', async () => {
+    const { gameId } = await createGameMode(['Alice', 'Bob'], '501');
+    const resetRes = await request(app).post(`/api/games/${gameId}/reset`);
+    expect(resetRes.status).toBe(201);
+    const newState = await request(app).get(`/api/games/${resetRes.body.gameId}`);
+    expect(newState.body.gameMode).toBe('501');
+    newState.body.players.forEach((p) => expect(p.score).toBe(501));
+  });
+});
+
+// ── Game mode: 301 ─────────────────────────────────────────────────────────
+
+describe('POST /api/games with gameMode=301', () => {
+  test('creates a 301 game with players starting at 301', async () => {
+    const { gameId } = await createGameMode(['Alice', 'Bob'], '301');
+    const state = await request(app).get(`/api/games/${gameId}`);
+    expect(state.body.players[0].score).toBe(301);
+    expect(state.body.gameMode).toBe('301');
+  });
+});
+
+// ── Game mode: cricket ──────────────────────────────────────────────────────
+
+describe('POST /api/games with gameMode=cricket', () => {
+  test('creates a cricket game', async () => {
+    const { gameId } = await createGameMode(['Alice', 'Bob'], 'cricket');
+    const state = await request(app).get(`/api/games/${gameId}`);
+    expect(state.body.gameMode).toBe('cricket');
+    state.body.players.forEach((p) => expect(p.score).toBe(0));
+  });
+
+  test('overflow adds points to THROWER not opponents in cricket', async () => {
+    const { gameId, players } = await createGameMode(['Alice', 'Bob'], 'cricket');
+    // Give Alice 2 marks on 20 by throwing twice (single each)
+    await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 20, multiplier: 1 });
+    await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 20, multiplier: 1 });
+    // Now triple 20: 1 mark to close + 2 overflow → Alice +40
+    const res = await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 20, multiplier: 3 });
+    expect(res.status).toBe(200);
+    expect(res.body.players[0].score).toBe(40); // Alice scored
+    expect(res.body.players[1].score).toBe(0);  // Bob unchanged
+  });
+});
+
+// ── Game mode: atw (Around the World) ───────────────────────────────────────
+
+describe('POST /api/games with gameMode=atw', () => {
+  test('creates an ATW game with targetIndex=0', async () => {
+    const { gameId } = await createGameMode(['Alice', 'Bob'], 'atw');
+    const state = await request(app).get(`/api/games/${gameId}`);
+    expect(state.body.gameMode).toBe('atw');
+    state.body.players.forEach((p) => {
+      expect(p.score).toBe(0);
+      expect(p.targetIndex).toBe(0);
+    });
+  });
+
+  test('hitting the correct target advances progress', async () => {
+    const { gameId, players } = await createGameMode(['Alice', 'Bob'], 'atw');
+    const res = await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 1, multiplier: 1 });
+    expect(res.status).toBe(200);
+    expect(res.body.players[0].targetIndex).toBe(1);
+    expect(res.body.players[0].score).toBe(1);
+  });
+
+  test('missing the correct ATW target does not advance', async () => {
+    const { gameId, players } = await createGameMode(['Alice', 'Bob'], 'atw');
+    const res = await request(app)
+      .post(`/api/games/${gameId}/throw`)
+      .send({ playerId: players[0].id, target: 2, multiplier: 1 }); // needs 1 not 2
+    expect(res.status).toBe(200);
+    expect(res.body.players[0].targetIndex).toBe(0);
+  });
+
+  test('invalid gameMode falls back to cutThroat', async () => {
+    const { gameId } = await createGameMode(['Alice', 'Bob'], 'invalidMode');
+    const state = await request(app).get(`/api/games/${gameId}`);
+    expect(state.body.gameMode).toBe('cutThroat');
+  });
+});

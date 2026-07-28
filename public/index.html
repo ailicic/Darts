@@ -338,6 +338,63 @@
       color: #7878aa;
       margin-bottom: 0.6rem;
     }
+
+    /* Game mode selector */
+    .mode-select-wrap {
+      margin-top: 1.2rem;
+    }
+
+    .mode-select-label {
+      display: block;
+      font-size: 0.85rem;
+      color: #a0a0c0;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 0.4rem;
+    }
+
+    .mode-select {
+      width: 100%;
+      padding: 0.65rem 0.9rem;
+      border-radius: 8px;
+      border: 1.5px solid #2a2a5a;
+      background: #0f3460;
+      color: #eee;
+      font-size: 1rem;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .mode-select:focus {
+      border-color: #e94560;
+    }
+
+    /* Expand/collapse button */
+    .btn-show-more {
+      display: block;
+      width: 100%;
+      margin-top: 0.5rem;
+      padding: 0.4rem;
+      background: transparent;
+      border: 1px dashed #2a2a5a;
+      border-radius: 6px;
+      color: #7878aa;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-show-more:hover {
+      border-color: #e94560;
+      color: #e94560;
+    }
+
+    .expandable-header .expand-arrow {
+      font-size: 0.7rem;
+      color: #7878aa;
+      margin-left: 4px;
+    }
   </style>
 
   <!-- ══ DevOps / observability dashboard theme — toggled by the Theme dropdown (default = off) ══ -->
@@ -553,12 +610,12 @@
 <body>
   <div class="header">
     <div class="logo">🎯 DARTS</div>
-    <div class="subtitle">Cut Throat Mode</div>
+    <div class="subtitle" id="mode-subtitle">Cut Throat Mode</div>
   </div>
 
   <div class="main-container">
-    <!-- Left: Today's Scoreboard + 1v1 Today -->
-    <div class="scoreboard-column">
+    <!-- Left: Today's matches + expandable All-Time -->
+    <div class="scoreboard-column" id="left-col">
       <div class="scoreboard">
         <h3>
           🏆 Today (3+ players)
@@ -573,6 +630,22 @@
           <span class="sb-date" id="sb-today-1v1-date"></span>
         </h3>
         <div id="sb-today-1v1-body"><div class="sb-empty">Loading…</div></div>
+      </div>
+
+      <!-- All-Time boards (collapsed by default, show 3 rows) -->
+      <div class="scoreboard" style="margin-top:1rem;" id="alltime-panel">
+        <h3 class="expandable-header" id="alltime-toggle" style="cursor:pointer;" title="Click to expand/collapse">
+          ⭐ All-Time (3+ players) <span class="expand-arrow" id="alltime-arrow">▼</span>
+        </h3>
+        <div id="sb-alltime-body"><div class="sb-empty">Loading…</div></div>
+        <button class="btn-show-more" id="btn-alltime-more" style="display:none;">Show more ▼</button>
+      </div>
+      <div class="scoreboard" style="margin-top:1rem;" id="alltime-1v1-panel">
+        <h3 class="expandable-header" id="alltime-1v1-toggle" style="cursor:pointer;" title="Click to expand/collapse">
+          ⚔️ All-Time (1v1) <span class="expand-arrow" id="alltime-1v1-arrow">▼</span>
+        </h3>
+        <div id="sb-alltime-1v1-body"><div class="sb-empty">Loading…</div></div>
+        <button class="btn-show-more" id="btn-alltime-1v1-more" style="display:none;">Show more ▼</button>
       </div>
     </div>
 
@@ -590,13 +663,26 @@
         <div class="add-players-label">Additional Players</div>
         <div id="players-list"></div>
         <button class="btn-add" id="btn-add">+ Add Player</button>
+
+        <!-- Game mode selector -->
+        <div class="mode-select-wrap">
+          <label class="mode-select-label" for="game-mode-select">Game Mode</label>
+          <select id="game-mode-select" class="mode-select">
+            <option value="cutThroat">🎯 Cut Throat Cricket</option>
+            <option value="cricket">🏏 Standard Cricket</option>
+            <option value="501">🔢 501</option>
+            <option value="301">🔢 301</option>
+            <option value="atw">🌍 Around the World</option>
+          </select>
+        </div>
+
         <div id="error-msg"></div>
         <button class="btn-start" id="btn-start">Start Game</button>
       </div>
 
-      <div class="rules">
-        <h3>Cut Throat Rules</h3>
-        <ul>
+      <div class="rules" id="rules-panel">
+        <h3 id="rules-title">Cut Throat Rules</h3>
+        <ul id="rules-list">
           <li>Targets: 15, 16, 17, 18, 19, 20, Bull</li>
           <li>Hit a number 3 times to <strong>close</strong> it</li>
           <li>Once closed, extra hits add points to opponents who haven't closed it</li>
@@ -605,19 +691,24 @@
       </div>
     </div>
 
-    <!-- Right: All-Time Scoreboard + 1v1 All-Time -->
-    <div class="scoreboard-column">
+    <!-- Right: Top 10 this month (expandable to all) -->
+    <div class="scoreboard-column" id="right-col">
       <div class="scoreboard">
         <h3>
-          ⭐ All-Time (3+ players)
+          📅 This Month (3+)
+          <span class="sb-date" id="sb-month-label"></span>
         </h3>
-        <div id="sb-alltime-body"><div class="sb-empty">Loading…</div></div>
+        <div class="sb-subtitle">🥇 3 pts · 🥈 2 pts · 🥉 1 pt (4+ players) / 0 pt (3 players)</div>
+        <div id="sb-month-body"><div class="sb-empty">Loading…</div></div>
+        <button class="btn-show-more" id="btn-month-more" style="display:none;">Show all ▼</button>
       </div>
       <div class="scoreboard" style="margin-top:1rem;">
         <h3>
-          ⚔️ All-Time (1v1)
+          ⚔️ This Month (1v1)
+          <span class="sb-date" id="sb-month-1v1-label"></span>
         </h3>
-        <div id="sb-alltime-1v1-body"><div class="sb-empty">Loading…</div></div>
+        <div id="sb-month-1v1-body"><div class="sb-empty">Loading…</div></div>
+        <button class="btn-show-more" id="btn-month-1v1-more" style="display:none;">Show all ▼</button>
       </div>
     </div>
   </div>
@@ -767,6 +858,8 @@
       // Randomise player order
       shuffle(names);
 
+      const gameMode = document.getElementById('game-mode-select').value;
+
       btnStart.disabled = true;
       btnStart.textContent = 'Starting…';
 
@@ -774,7 +867,7 @@
         const res = await fetch('/api/games', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerNames: names }),
+          body: JSON.stringify({ playerNames: names, gameMode }),
         });
         const data = await res.json();
 
@@ -843,6 +936,74 @@
       return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    // ── Game mode rules ──────────────────────────────────────────────────────
+
+    const RULES = {
+      cutThroat: {
+        title: 'Cut Throat Rules',
+        subtitle: 'Cut Throat Mode',
+        items: [
+          'Targets: 15, 16, 17, 18, 19, 20, Bull',
+          'Hit a number 3 times to <strong>close</strong> it',
+          'Once closed, extra hits add points to opponents who haven\'t closed it',
+          'Goal: close all numbers with the <strong>lowest score</strong>',
+        ],
+      },
+      cricket: {
+        title: 'Standard Cricket Rules',
+        subtitle: 'Cricket Mode',
+        items: [
+          'Targets: 15, 16, 17, 18, 19, 20, Bull',
+          'Hit a number 3 times to <strong>close</strong> it',
+          'Once closed, extra hits add points to <strong>your own score</strong>',
+          'Goal: close all numbers with the <strong>highest score</strong>',
+        ],
+      },
+      '501': {
+        title: '501 Rules',
+        subtitle: '501 Mode',
+        items: [
+          'All targets 1–20 + Bull (single=25, double=50)',
+          'Start at 501 — subtract each throw',
+          'Must finish on a <strong>double</strong> to win',
+          'Cannot go below 0 (bust = dart wasted)',
+        ],
+      },
+      '301': {
+        title: '301 Rules',
+        subtitle: '301 Mode',
+        items: [
+          'All targets 1–20 + Bull (single=25, double=50)',
+          'Start at 301 — subtract each throw',
+          'Must finish on a <strong>double</strong> to win',
+          'Cannot go below 0 (bust = dart wasted)',
+        ],
+      },
+      atw: {
+        title: 'Around the World Rules',
+        subtitle: 'Around the World',
+        items: [
+          'Hit targets 1–20 then Bull <strong>in order</strong>',
+          'Any single, double, or triple counts',
+          'First player to hit all 21 targets wins',
+          'No multiplier advantage — every hit advances by 1',
+        ],
+      },
+    };
+
+    const modeSelect = document.getElementById('game-mode-select');
+
+    function updateModeUI() {
+      const mode = modeSelect.value;
+      const rule = RULES[mode] || RULES.cutThroat;
+      document.getElementById('mode-subtitle').textContent = rule.subtitle;
+      document.getElementById('rules-title').textContent = rule.title;
+      document.getElementById('rules-list').innerHTML = rule.items.map(i => `<li>${i}</li>`).join('');
+    }
+
+    modeSelect.addEventListener('change', updateModeUI);
+    updateModeUI();
+
     // ── Scoreboards ──────────────────────────────────────────────────────
 
     function isSameDay(isoDate) {
@@ -853,52 +1014,45 @@
              d.getDate() === now.getDate();
     }
 
+    function isSameMonth(isoDate) {
+      const d = new Date(isoDate);
+      const now = new Date();
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }
+
     function rankEmoji(i) {
       return ['🥇','🥈','🥉'][i] || `${i + 1}.`;
     }
 
-    function renderScoreboards(results) {
-      const sbTodayDate = document.getElementById('sb-today-date');
-      const sbToday1v1Date = document.getElementById('sb-today-1v1-date');
-      const dateStr = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-      sbTodayDate.textContent = dateStr;
-      sbToday1v1Date.textContent = dateStr;
+    // Build a rendered list of sb-row divs, respecting a visible limit.
+    // Returns { html, total } where html is the rendered content.
+    function buildPointsRows(resultsList, limit) {
+      if (resultsList.length === 0) return { html: '<div class="sb-empty">No games yet</div>', total: 0 };
 
-      const todayResults = results.filter(r => isSameDay(r.date));
-
-      // Split by game size
-      const multi = results.filter(r => r.players.length >= 3);
-      const multiToday = todayResults.filter(r => r.players.length >= 3);
-      const duel = results.filter(r => r.players.length === 2);
-      const duelToday = todayResults.filter(r => r.players.length === 2);
-
-      // 3+ player scoreboard (points)
-      function buildPointsBoard(resultsList) {
-        if (resultsList.length === 0) return '<div class="sb-empty">No games yet</div>';
-
-        const stats = {};
-        resultsList.forEach(r => {
-          r.players.forEach(name => {
-            if (!stats[name]) stats[name] = { points: 0, played: 0, wins: 0 };
-            stats[name].played++;
-          });
-          if (r.placements) {
-            const rankPts = r.players.length === 3 ? { 1: 3, 2: 2, 3: 0 } : { 1: 3, 2: 2, 3: 1 };
-            r.placements.forEach(({ name, rank }) => {
-              if (!stats[name]) stats[name] = { points: 0, played: 0, wins: 0 };
-              stats[name].points += (rankPts[rank] || 0);
-              if (rank === 1) stats[name].wins++;
-            });
-          } else if (r.winner) {
-            if (!stats[r.winner]) stats[r.winner] = { points: 0, played: 0, wins: 0 };
-            stats[r.winner].wins++;
-          }
+      const stats = {};
+      resultsList.forEach(r => {
+        r.players.forEach(name => {
+          if (!stats[name]) stats[name] = { points: 0, played: 0, wins: 0 };
+          stats[name].played++;
         });
+        if (r.placements) {
+          const rankPts = r.players.length === 3 ? { 1: 3, 2: 2, 3: 0 } : { 1: 3, 2: 2, 3: 1 };
+          r.placements.forEach(({ name, rank }) => {
+            if (!stats[name]) stats[name] = { points: 0, played: 0, wins: 0 };
+            stats[name].points += (rankPts[rank] || 0);
+            if (rank === 1) stats[name].wins++;
+          });
+        } else if (r.winner) {
+          if (!stats[r.winner]) stats[r.winner] = { points: 0, played: 0, wins: 0 };
+          stats[r.winner].wins++;
+        }
+      });
 
-        const sorted = Object.entries(stats).sort((a, b) => b[1].points - a[1].points);
-        return sorted.map(([name, { points, played, wins }], i) => {
-          const pct = played > 0 ? Math.round((wins / played) * 100) : 0;
-          return `
+      const sorted = Object.entries(stats).sort((a, b) => b[1].points - a[1].points);
+      const visible = limit != null ? sorted.slice(0, limit) : sorted;
+      const html = visible.map(([name, { points, played, wins }], i) => {
+        const pct = played > 0 ? Math.round((wins / played) * 100) : 0;
+        return `
           <div class="sb-row">
             <span class="sb-rank">${rankEmoji(i)}</span>
             <span class="sb-name">${escapeHtml(name)}</span>
@@ -907,45 +1061,160 @@
             <span class="sb-pct">${pct}%</span>
           </div>
         `;
-        }).join('');
-      }
-
-      // 1v1 scoreboard (wins)
-      function buildWinsBoard(resultsList) {
-        if (resultsList.length === 0) return '<div class="sb-empty">No games yet</div>';
-
-        const stats = {};
-        resultsList.forEach(r => {
-          r.players.forEach(name => {
-            if (!stats[name]) stats[name] = { wins: 0, played: 0 };
-            stats[name].played++;
-          });
-          if (r.winner) {
-            if (!stats[r.winner]) stats[r.winner] = { wins: 0, played: 0 };
-            stats[r.winner].wins++;
-          }
-        });
-
-        const sorted = Object.entries(stats).sort((a, b) => b[1].wins - a[1].wins);
-        return sorted.map(([name, { wins, played }], i) => {
-          const pct = played > 0 ? Math.round((wins / played) * 100) : 0;
-          return `
-            <div class="sb-row">
-              <span class="sb-rank">${rankEmoji(i)}</span>
-              <span class="sb-name">${escapeHtml(name)}</span>
-              <span class="sb-wins">${wins}</span>
-              <span class="sb-wins-label">W</span>
-              <span class="sb-pct">${pct}%</span>
-            </div>
-          `;
-        }).join('');
-      }
-
-      document.getElementById('sb-today-body').innerHTML = buildPointsBoard(multiToday);
-      document.getElementById('sb-alltime-body').innerHTML = buildPointsBoard(multi);
-      document.getElementById('sb-today-1v1-body').innerHTML = buildWinsBoard(duelToday);
-      document.getElementById('sb-alltime-1v1-body').innerHTML = buildWinsBoard(duel);
+      }).join('');
+      return { html, total: sorted.length };
     }
+
+    function buildWinsRows(resultsList, limit) {
+      if (resultsList.length === 0) return { html: '<div class="sb-empty">No games yet</div>', total: 0 };
+
+      const stats = {};
+      resultsList.forEach(r => {
+        r.players.forEach(name => {
+          if (!stats[name]) stats[name] = { wins: 0, played: 0 };
+          stats[name].played++;
+        });
+        if (r.winner) {
+          if (!stats[r.winner]) stats[r.winner] = { wins: 0, played: 0 };
+          stats[r.winner].wins++;
+        }
+      });
+
+      const sorted = Object.entries(stats).sort((a, b) => b[1].wins - a[1].wins);
+      const visible = limit != null ? sorted.slice(0, limit) : sorted;
+      const html = visible.map(([name, { wins, played }], i) => {
+        const pct = played > 0 ? Math.round((wins / played) * 100) : 0;
+        return `
+          <div class="sb-row">
+            <span class="sb-rank">${rankEmoji(i)}</span>
+            <span class="sb-name">${escapeHtml(name)}</span>
+            <span class="sb-wins">${wins}</span>
+            <span class="sb-wins-label">W</span>
+            <span class="sb-pct">${pct}%</span>
+          </div>
+        `;
+      }).join('');
+      return { html, total: sorted.length };
+    }
+
+    // State for expand/collapse
+    const expandState = {
+      alltime: false,
+      alltime1v1: false,
+      month: false,
+      month1v1: false,
+    };
+    const ALLTIME_DEFAULT_ROWS = 3;
+    const MONTH_DEFAULT_ROWS = 10;
+
+    let cachedResults = [];
+
+    function renderScoreboards(results) {
+      cachedResults = results;
+
+      const dateStr = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      const monthStr = new Date().toLocaleString(undefined, { month: 'short', year: 'numeric' });
+      document.getElementById('sb-today-date').textContent = dateStr;
+      document.getElementById('sb-today-1v1-date').textContent = dateStr;
+      document.getElementById('sb-month-label').textContent = monthStr;
+      document.getElementById('sb-month-1v1-label').textContent = monthStr;
+
+      const todayResults = results.filter(r => isSameDay(r.date));
+      const monthResults = results.filter(r => isSameMonth(r.date));
+
+      // Split by game size
+      const multi = results.filter(r => r.players.length >= 3);
+      const multiToday = todayResults.filter(r => r.players.length >= 3);
+      const multiMonth = monthResults.filter(r => r.players.length >= 3);
+      const duel = results.filter(r => r.players.length === 2);
+      const duelToday = todayResults.filter(r => r.players.length === 2);
+      const duelMonth = monthResults.filter(r => r.players.length === 2);
+
+      // Today boards (show all)
+      document.getElementById('sb-today-body').innerHTML = buildPointsRows(multiToday, null).html;
+      document.getElementById('sb-today-1v1-body').innerHTML = buildWinsRows(duelToday, null).html;
+
+      // All-time boards (default 3, expandable)
+      renderAlltimeBoard(multi, duel);
+
+      // This month boards (default top 10, expandable)
+      renderMonthBoard(multiMonth, duelMonth);
+    }
+
+    function renderAlltimeBoard(multi, duel) {
+      const limit = expandState.alltime ? null : ALLTIME_DEFAULT_ROWS;
+      const { html: h1, total: t1 } = buildPointsRows(multi, limit);
+      document.getElementById('sb-alltime-body').innerHTML = h1;
+      const btn1 = document.getElementById('btn-alltime-more');
+      if (t1 > ALLTIME_DEFAULT_ROWS) {
+        btn1.style.display = 'block';
+        btn1.textContent = expandState.alltime ? 'Show less ▲' : `Show all (${t1}) ▼`;
+      } else {
+        btn1.style.display = 'none';
+      }
+
+      const limit2 = expandState.alltime1v1 ? null : ALLTIME_DEFAULT_ROWS;
+      const { html: h2, total: t2 } = buildWinsRows(duel, limit2);
+      document.getElementById('sb-alltime-1v1-body').innerHTML = h2;
+      const btn2 = document.getElementById('btn-alltime-1v1-more');
+      if (t2 > ALLTIME_DEFAULT_ROWS) {
+        btn2.style.display = 'block';
+        btn2.textContent = expandState.alltime1v1 ? 'Show less ▲' : `Show all (${t2}) ▼`;
+      } else {
+        btn2.style.display = 'none';
+      }
+    }
+
+    function renderMonthBoard(multiMonth, duelMonth) {
+      const limit = expandState.month ? null : MONTH_DEFAULT_ROWS;
+      const { html: h1, total: t1 } = buildPointsRows(multiMonth, limit);
+      document.getElementById('sb-month-body').innerHTML = h1;
+      const btn1 = document.getElementById('btn-month-more');
+      if (t1 > MONTH_DEFAULT_ROWS) {
+        btn1.style.display = 'block';
+        btn1.textContent = expandState.month ? 'Show less ▲' : `Show all (${t1}) ▼`;
+      } else {
+        btn1.style.display = 'none';
+      }
+
+      const limit2 = expandState.month1v1 ? null : MONTH_DEFAULT_ROWS;
+      const { html: h2, total: t2 } = buildWinsRows(duelMonth, limit2);
+      document.getElementById('sb-month-1v1-body').innerHTML = h2;
+      const btn2 = document.getElementById('btn-month-1v1-more');
+      if (t2 > MONTH_DEFAULT_ROWS) {
+        btn2.style.display = 'block';
+        btn2.textContent = expandState.month1v1 ? 'Show less ▲' : `Show all (${t2}) ▼`;
+      } else {
+        btn2.style.display = 'none';
+      }
+    }
+
+    // Expand/collapse handlers
+    document.getElementById('btn-alltime-more').addEventListener('click', () => {
+      expandState.alltime = !expandState.alltime;
+      const multi = cachedResults.filter(r => r.players.length >= 3);
+      const duel = cachedResults.filter(r => r.players.length === 2);
+      renderAlltimeBoard(multi, duel);
+    });
+
+    document.getElementById('btn-alltime-1v1-more').addEventListener('click', () => {
+      expandState.alltime1v1 = !expandState.alltime1v1;
+      const multi = cachedResults.filter(r => r.players.length >= 3);
+      const duel = cachedResults.filter(r => r.players.length === 2);
+      renderAlltimeBoard(multi, duel);
+    });
+
+    document.getElementById('btn-month-more').addEventListener('click', () => {
+      expandState.month = !expandState.month;
+      const monthResults = cachedResults.filter(r => isSameMonth(r.date));
+      renderMonthBoard(monthResults.filter(r => r.players.length >= 3), monthResults.filter(r => r.players.length === 2));
+    });
+
+    document.getElementById('btn-month-1v1-more').addEventListener('click', () => {
+      expandState.month1v1 = !expandState.month1v1;
+      const monthResults = cachedResults.filter(r => isSameMonth(r.date));
+      renderMonthBoard(monthResults.filter(r => r.players.length >= 3), monthResults.filter(r => r.players.length === 2));
+    });
 
     function loadScorecards() {
       fetch('/api/results')
@@ -954,7 +1223,7 @@
         .catch(() => {
           document.getElementById('sb-today-body').innerHTML =
             '<div class="sb-empty">Error loading</div>';
-          document.getElementById('sb-alltime-body').innerHTML =
+          document.getElementById('sb-month-body').innerHTML =
             '<div class="sb-empty">Error loading</div>';
         });
     }

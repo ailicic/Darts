@@ -19,7 +19,12 @@ const APP_VERSION = (() => {
   }
 })();
 
-const { createPlayer, processThrow, checkWinCondition, TARGETS, isClosed } = require('./gameLogic');
+const { createPlayer, processThrow, checkWinCondition, TARGETS, isClosed,
+        GAME_MODES, X01_TARGETS, ATW_TARGETS,
+        createPlayerX01, processThrowX01, checkWinConditionX01,
+        processThrowCricket, checkWinConditionCricket,
+        createPlayerATW, processThrowATW, checkWinConditionATW,
+      } = require('./gameLogic');
 const {
   httpRequestDuration,
   httpRequestTotal,
@@ -65,17 +70,33 @@ function sanitizeName(name) {
 }
 
 // ── Helper: rank players at end of game ──────────────────────────────────────
-function computePlacements(players, winnerId) {
+function computePlacements(players, winnerId, gameMode) {
+  const mode = gameMode || GAME_MODES.CUT_THROAT;
   const winner = players.find((p) => p.id === winnerId);
   const others = players.filter((p) => p.id !== winnerId);
-  others.sort((a, b) => a.score - b.score);
+
+  // Sort non-winner players by their standing in the game mode
+  if (mode === GAME_MODES.X501 || mode === GAME_MODES.X301) {
+    // Lower remaining score is better
+    others.sort((a, b) => a.score - b.score);
+  } else if (mode === GAME_MODES.ATW) {
+    // More targets hit is better
+    others.sort((a, b) => b.score - a.score);
+  } else if (mode === GAME_MODES.CRICKET) {
+    // Higher score is better in standard cricket
+    others.sort((a, b) => b.score - a.score);
+  } else {
+    // Cut Throat: lower score is better
+    others.sort((a, b) => a.score - b.score);
+  }
+
   return [winner, ...others].map((p, i) => ({ name: p.name, rank: i + 1 }));
 }
 
 // ── REST API ──────────────────────────────────────────────────────────────────
 
 app.post('/api/games', (req, res) => {
-  const { playerNames } = req.body;
+  const { playerNames, gameMode: rawMode } = req.body;
 
   if (!Array.isArray(playerNames) || playerNames.length < 2) {
     return res.status(400).json({ error: 'At least 2 players are required.' });
@@ -84,16 +105,30 @@ app.post('/api/games', (req, res) => {
     return res.status(400).json({ error: 'Maximum 8 players are supported.' });
   }
 
+  const validModes = Object.values(GAME_MODES);
+  const gameMode = validModes.includes(rawMode) ? rawMode : GAME_MODES.CUT_THROAT;
+
   const sanitized = playerNames.map(sanitizeName).filter(Boolean);
   if (sanitized.length < 2) {
     return res.status(400).json({ error: 'At least 2 valid player names are required.' });
   }
 
   const gameId = uuidv4();
-  const players = sanitized.map((name) => createPlayer(uuidv4(), name));
+  let players;
+  if (gameMode === GAME_MODES.X501) {
+    players = sanitized.map((name) => createPlayerX01(uuidv4(), name, 501));
+  } else if (gameMode === GAME_MODES.X301) {
+    players = sanitized.map((name) => createPlayerX01(uuidv4(), name, 301));
+  } else if (gameMode === GAME_MODES.ATW) {
+    players = sanitized.map((name) => createPlayerATW(uuidv4(), name));
+  } else {
+    // cutThroat and cricket share the same player structure
+    players = sanitized.map((name) => createPlayer(uuidv4(), name));
+  }
 
   games[gameId] = {
     id: gameId,
+    gameMode,
     players,
     currentPlayerIndex: 0,
     dartsThrown: 0,
@@ -138,7 +173,14 @@ app.post('/api/games/:gameId/throw', async (req, res) => {
   if (![1, 2, 3].includes(m)) {
     return res.status(400).json({ error: 'Multiplier must be 1, 2 or 3.' });
   }
-  if (t !== 0 && !TARGETS.includes(t)) {
+
+  // Validate target against the mode's allowed set
+  const mode = game.gameMode || GAME_MODES.CUT_THROAT;
+  const isX01 = mode === GAME_MODES.X501 || mode === GAME_MODES.X301;
+  const isATW = mode === GAME_MODES.ATW;
+  const validTargets = isX01 ? X01_TARGETS : isATW ? ATW_TARGETS : TARGETS;
+
+  if (t !== 0 && !validTargets.includes(t)) {
     return res.status(400).json({ error: 'Invalid target.' });
   }
   if (t === 25 && m === 3) {
@@ -149,19 +191,43 @@ app.post('/api/games/:gameId/throw', async (req, res) => {
     return res.status(409).json({ error: 'Turn already complete, call end-turn first.' });
   }
 
+  // Snapshot of all players BEFORE this throw (used by bounce/undo)
   const snapshot = game.players.map((p) => ({
     id: p.id,
     marks: { ...p.marks },
     score: p.score,
+    ...(p.targetIndex !== undefined ? { targetIndex: p.targetIndex } : {}),
   }));
 
-  const result = processThrow(game.players, game.currentPlayerIndex, t, m);
+  // Process the throw based on game mode
+  let result;
+  if (mode === GAME_MODES.CRICKET) {
+    result = processThrowCricket(game.players, game.currentPlayerIndex, t, m);
+  } else if (isX01) {
+    result = processThrowX01(game.players, game.currentPlayerIndex, t, m);
+  } else if (isATW) {
+    result = processThrowATW(game.players, game.currentPlayerIndex, t, m);
+  } else {
+    // default: cutThroat
+    result = processThrow(game.players, game.currentPlayerIndex, t, m);
+  }
+
   game.dartsThrown += 1;
   game.currentTurnThrows.push({ target: t, multiplier: m, result, snapshot });
 
   dartsThrown.inc();
 
-  const winCheck = checkWinCondition(game.players);
+  // Select appropriate win-condition check
+  let winCheck;
+  if (mode === GAME_MODES.CRICKET) {
+    winCheck = checkWinConditionCricket(game.players);
+  } else if (isX01) {
+    winCheck = checkWinConditionX01(game.players);
+  } else if (isATW) {
+    winCheck = checkWinConditionATW(game.players);
+  } else {
+    winCheck = checkWinCondition(game.players);
+  }
 
   if (winCheck.gameOver) {
     game.gameOver = true;
@@ -169,7 +235,7 @@ app.post('/api/games/:gameId/throw', async (req, res) => {
     const winner = game.players.find((p) => p.id === winCheck.winnerId);
     if (winner) {
       const now = new Date().toISOString();
-      const placements = computePlacements(game.players, winCheck.winnerId);
+      const placements = computePlacements(game.players, winCheck.winnerId, mode);
 
       // Only award placement points for 3+ player games
       const finalPlacements = game.players.length >= 3 ? placements : null;
@@ -242,6 +308,9 @@ app.post('/api/games/:gameId/bounce', (req, res) => {
   lastThrow.snapshot.forEach((saved, idx) => {
     game.players[idx].marks = { ...saved.marks };
     game.players[idx].score = saved.score;
+    if (saved.targetIndex !== undefined) {
+      game.players[idx].targetIndex = saved.targetIndex;
+    }
   });
   game.dartsThrown -= 1;
 
@@ -271,6 +340,9 @@ app.post('/api/games/:gameId/undo-turn', (req, res) => {
     lastTurn.throws[0].snapshot.forEach((saved, idx) => {
       game.players[idx].marks = { ...saved.marks };
       game.players[idx].score = saved.score;
+      if (saved.targetIndex !== undefined) {
+        game.players[idx].targetIndex = saved.targetIndex;
+      }
     });
   }
 
@@ -311,11 +383,23 @@ app.post('/api/games/:gameId/reset', (req, res) => {
   if (!game) return res.status(404).json({ error: 'Game not found.' });
 
   const playerNames = game.players.map((p) => p.name);
+  const gameMode = game.gameMode || GAME_MODES.CUT_THROAT;
   const newGameId = uuidv4();
-  const players = playerNames.map((name) => createPlayer(uuidv4(), name));
+
+  let players;
+  if (gameMode === GAME_MODES.X501) {
+    players = playerNames.map((name) => createPlayerX01(uuidv4(), name, 501));
+  } else if (gameMode === GAME_MODES.X301) {
+    players = playerNames.map((name) => createPlayerX01(uuidv4(), name, 301));
+  } else if (gameMode === GAME_MODES.ATW) {
+    players = playerNames.map((name) => createPlayerATW(uuidv4(), name));
+  } else {
+    players = playerNames.map((name) => createPlayer(uuidv4(), name));
+  }
 
   games[newGameId] = {
     id: newGameId,
+    gameMode,
     players,
     currentPlayerIndex: 0,
     dartsThrown: 0,
@@ -441,8 +525,14 @@ io.on('connection', (socket) => {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function gameState(game) {
+  const mode = game.gameMode || GAME_MODES.CUT_THROAT;
+  const isX01 = mode === GAME_MODES.X501 || mode === GAME_MODES.X301;
+  const isATW = mode === GAME_MODES.ATW;
+  const targets = isX01 ? X01_TARGETS : isATW ? ATW_TARGETS : TARGETS;
+
   return {
     id: game.id,
+    gameMode: mode,
     players: game.players,
     currentPlayerId: game.players[game.currentPlayerIndex]?.id,
     dartsThrown: game.dartsThrown,
@@ -450,7 +540,7 @@ function gameState(game) {
     turnHistory: game.turnHistory,
     gameOver: game.gameOver,
     winnerId: game.winnerId,
-    targets: TARGETS,
+    targets,
     claimedPlayerIds: [...game.claimedPlayerIds],
   };
 }
